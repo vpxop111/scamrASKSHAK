@@ -4,6 +4,7 @@ import SmsAndroid from 'react-native-get-sms-android';
 
 const App = () => {
   const [latestSms, setLatestSms] = useState('');
+  const [smsSender, setSmsSender] = useState(''); // State for phone number
   const [predictedResult, setPredictedResult] = useState('');
   const [timer, setTimer] = useState(20);
   const timerRef = useRef(null);
@@ -54,7 +55,9 @@ const App = () => {
         const messages = JSON.parse(smsList);
         if (messages.length > 0) {
           const latestMessage = messages[0].body;
+          const sender = messages[0].address; // Extract sender's phone number
           setLatestSms(latestMessage);
+          setSmsSender(sender); // Update phone number state
         }
       },
     );
@@ -129,6 +132,8 @@ const App = () => {
       <Text style={styles.title}>SMS Reader</Text>
       {latestSms ? (
         <View style={styles.smsContainer}>
+          <Text style={styles.smsTitle}>Latest SMS from:</Text>
+          <Text style={styles.smsSender}>{smsSender}</Text>
           <Text style={styles.smsTitle}>Latest SMS:</Text>
           <Text style={styles.smsBody}>{latestSms}</Text>
         </View>
@@ -166,6 +171,11 @@ const styles = StyleSheet.create({
   },
   smsTitle: {
     fontWeight: 'bold',
+  },
+  smsSender: {
+    marginTop: 5,
+    fontSize: 18,
+    fontStyle: 'italic',
   },
   smsBody: {
     marginTop: 5,
