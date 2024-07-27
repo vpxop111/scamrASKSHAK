@@ -1,15 +1,17 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {StyleSheet, Text, View, PermissionsAndroid} from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
+import {supabase} from './supabase'; // Import Supabase client
 
 const App = () => {
   const [latestSms, setLatestSms] = useState('');
-  const [smsSender, setSmsSender] = useState(''); // State for phone number
+  const [smsSender, setSmsSender] = useState('');
   const [predictedResult, setPredictedResult] = useState('');
   const [timer, setTimer] = useState(20);
   const timerRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
 
   useEffect(() => {
     requestReadSmsPermission();
@@ -55,9 +57,13 @@ const App = () => {
         const messages = JSON.parse(smsList);
         if (messages.length > 0) {
           const latestMessage = messages[0].body;
-          const sender = messages[0].address; // Extract sender's phone number
-          setLatestSms(latestMessage);
-          setSmsSender(sender); // Update phone number state
+          const sender = messages[0].address;
+          const messageId = messages[0]._id;
+          if (messageId !== lastProcessedSmsId) {
+            setLatestSms(latestMessage);
+            setSmsSender(sender);
+            setLastProcessedSmsId(messageId);
+          }
         }
       },
     );
@@ -72,7 +78,7 @@ const App = () => {
       setTimer(prevTimer => {
         if (prevTimer === 1) {
           checkForNewMessage();
-          return 20; // Reset timer for the next cycle
+          return 20;
         }
         return prevTimer - 1;
       });
@@ -112,12 +118,45 @@ const App = () => {
       const data = await response.json();
       const result = data.predicted_result || 'No result found';
       setPredictedResult(result);
+
+      if (result.toLowerCase() === 'scam') {
+        storeScamMessage(smsSender, latestSms);
+      }
     } catch (error) {
       console.error('Error sending message to API: ', error);
       setPredictedResult('Error sending message to API');
     } finally {
       setProcessing(false);
       setIsChecking(false);
+    }
+  };
+
+  const storeScamMessage = async (phoneNumber, message) => {
+    try {
+      if (typeof phoneNumber !== 'string') {
+        console.error('Invalid phone number type');
+        return;
+      }
+
+      const {data, error: insertError} = await supabase
+        .from('scammers')
+        .insert([{scam_no: phoneNumber, scam_mes: message}]);
+
+      if (insertError) {
+        if (
+          insertError.message.includes(
+            'duplicate key value violates unique constraint',
+          )
+        ) {
+          console.log('Duplicate entry detected, no action needed.');
+        } else {
+          throw insertError;
+        }
+      } else {
+        console.log('Scam message successfully stored.');
+      }
+    } catch (error) {
+      console.error('Error storing scam message in Supabase: ', error);
     }
   };
 
