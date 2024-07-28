@@ -8,6 +8,9 @@ const App = () => {
   const [smsSender, setSmsSender] = useState('');
   const [predictedResult, setPredictedResult] = useState('');
   const [timer, setTimer] = useState(20);
+  const [apiStatus, setApiStatus] = useState('');
+  const [scamNumbers, setScamNumbers] = useState([]);
+  const [isScammer, setIsScammer] = useState(false);
   const timerRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -15,6 +18,7 @@ const App = () => {
 
   useEffect(() => {
     requestReadSmsPermission();
+    fetchScamNumbers();
     startTimer();
     return () => {
       if (timerRef.current) {
@@ -43,6 +47,20 @@ const App = () => {
     }
   };
 
+  const fetchScamNumbers = async () => {
+    try {
+      const {data, error} = await supabase.from('scammers').select('scam_no');
+      if (error) {
+        console.error('Error fetching scam numbers: ', error);
+      } else {
+        const scamNumbers = data.map(item => item.scam_no);
+        setScamNumbers(scamNumbers);
+      }
+    } catch (error) {
+      console.error('Error fetching scam numbers: ', error);
+    }
+  };
+
   const readLatestSMS = () => {
     SmsAndroid.list(
       JSON.stringify({
@@ -61,12 +79,18 @@ const App = () => {
           const messageId = messages[0]._id;
           if (messageId !== lastProcessedSmsId) {
             setLatestSms(latestMessage);
-            setSmsSender(sender);
+            checkIfScammer(sender);
             setLastProcessedSmsId(messageId);
           }
         }
       },
     );
+  };
+
+  const checkIfScammer = sender => {
+    const isScammer = scamNumbers.includes(sender);
+    setIsScammer(isScammer);
+    setSmsSender(isScammer ? `${sender} (Scammer)` : sender);
   };
 
   const startTimer = () => {
@@ -99,6 +123,7 @@ const App = () => {
     }
 
     setProcessing(true);
+    setApiStatus('Sending message to API...');
     try {
       const response = await fetch(
         'https://varun324242-sssssss.hf.space/predict',
@@ -118,6 +143,7 @@ const App = () => {
       const data = await response.json();
       const result = data.predicted_result || 'No result found';
       setPredictedResult(result);
+      setApiStatus('API response received');
 
       if (result.toLowerCase() === 'scam') {
         storeScamMessage(smsSender, latestSms);
@@ -125,6 +151,7 @@ const App = () => {
     } catch (error) {
       console.error('Error sending message to API: ', error);
       setPredictedResult('Error sending message to API');
+      setApiStatus('Error sending message to API');
     } finally {
       setProcessing(false);
       setIsChecking(false);
@@ -187,6 +214,10 @@ const App = () => {
         <Text style={styles.timerTitle}>Timer:</Text>
         <Text style={styles.timerBody}>{timer}</Text>
       </View>
+      <View style={styles.apiStatusContainer}>
+        <Text style={styles.apiStatusTitle}>API Status:</Text>
+        <Text style={styles.apiStatusBody}>{apiStatus}</Text>
+      </View>
     </View>
   );
 };
@@ -194,60 +225,72 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
     padding: 20,
   },
   title: {
     fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
   },
   smsContainer: {
-    marginTop: 20,
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    backgroundColor: '#ffffff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
   },
   smsTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 5,
   },
   smsSender: {
-    marginTop: 5,
-    fontSize: 18,
-    fontStyle: 'italic',
+    fontSize: 16,
+    marginBottom: 10,
   },
   smsBody: {
-    marginTop: 5,
-    fontSize: 18,
+    fontSize: 16,
   },
   responseContainer: {
-    marginTop: 20,
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    backgroundColor: '#e6f7ff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
   },
   responseTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 5,
   },
   responseBody: {
-    marginTop: 5,
-    fontSize: 18,
-    fontFamily: 'Courier New',
-    color: 'gray',
+    fontSize: 16,
   },
   timerContainer: {
-    marginTop: 20,
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   timerTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
   },
   timerBody: {
-    marginTop: 5,
     fontSize: 18,
-    color: 'red',
+  },
+  apiStatusContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 10,
+    borderRadius: 5,
+  },
+  apiStatusTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  apiStatusBody: {
+    fontSize: 14,
   },
 });
 
