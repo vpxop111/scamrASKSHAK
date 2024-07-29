@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useRef} from 'react';
-import {StyleSheet, Text, View, PermissionsAndroid} from 'react-native';
+import {PermissionsAndroid, ScrollView, Text, View} from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 import {supabase} from './supabase'; // Import Supabase client
 
@@ -17,9 +17,14 @@ const App = () => {
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
 
   useEffect(() => {
-    requestReadSmsPermission();
-    fetchScamNumbers();
-    startTimer();
+    const initializeApp = async () => {
+      await requestReadSmsPermission();
+      await fetchScamNumbers();
+      startTimer();
+    };
+
+    initializeApp();
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -50,14 +55,18 @@ const App = () => {
   const fetchScamNumbers = async () => {
     try {
       const {data, error} = await supabase.from('scammers').select('scam_no');
+      console.log('Supabase Response:', data, error);
+
       if (error) {
-        console.error('Error fetching scam numbers: ', error);
-      } else {
-        const scamNumbers = data.map(item => item.scam_no);
-        setScamNumbers(scamNumbers);
+        console.error('Error fetching scam numbers:', error.message);
+        return;
       }
+
+      const scamNumbers = data.map(item => item.scam_no);
+      console.log('Fetched scam numbers:', scamNumbers);
+      setScamNumbers(scamNumbers);
     } catch (error) {
-      console.error('Error fetching scam numbers: ', error);
+      console.error('Error fetching scam numbers:', error.message);
     }
   };
 
@@ -79,8 +88,9 @@ const App = () => {
           const messageId = messages[0]._id;
           if (messageId !== lastProcessedSmsId) {
             setLatestSms(latestMessage);
-            checkIfScammer(sender);
+            setSmsSender(sender); // Set sender here
             setLastProcessedSmsId(messageId);
+            checkIfScammer(sender); // Check after setting sender
           }
         }
       },
@@ -88,6 +98,7 @@ const App = () => {
   };
 
   const checkIfScammer = sender => {
+    console.log('Current scamNumbers:', scamNumbers); // Log current scam numbers
     const isScammer = scamNumbers.includes(sender);
     setIsScammer(isScammer);
     setSmsSender(isScammer ? `${sender} (Scammer)` : sender);
@@ -194,12 +205,14 @@ const App = () => {
   }, [processing, latestSms, isChecking]);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>SMS Reader</Text>
       {latestSms ? (
         <View style={styles.smsContainer}>
           <Text style={styles.smsTitle}>Latest SMS from:</Text>
-          <Text style={styles.smsSender}>{smsSender}</Text>
+          <Text style={[styles.smsSender, isScammer && styles.scammer]}>
+            {smsSender}
+          </Text>
           <Text style={styles.smsTitle}>Latest SMS:</Text>
           <Text style={styles.smsBody}>{latestSms}</Text>
         </View>
@@ -218,9 +231,10 @@ const App = () => {
         <Text style={styles.apiStatusTitle}>API Status:</Text>
         <Text style={styles.apiStatusBody}>{apiStatus}</Text>
       </View>
-    </View>
+    </ScrollView>
   );
 };
+import {StyleSheet} from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
@@ -248,6 +262,10 @@ const styles = StyleSheet.create({
   smsSender: {
     fontSize: 16,
     marginBottom: 10,
+  },
+  scammer: {
+    color: 'red',
+    fontWeight: 'bold',
   },
   smsBody: {
     fontSize: 16,
