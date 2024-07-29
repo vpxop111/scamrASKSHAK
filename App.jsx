@@ -9,7 +9,6 @@ import {
   Modal,
   SafeAreaView,
   StatusBar,
-  ActivityIndicator,
   Dimensions,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
@@ -341,13 +340,6 @@ const App = () => {
             <Text style={styles.cardTitle}>Next Check</Text>
           </View>
           <Text style={styles.timerText}>{timer} seconds</Text>
-        </View>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Icon name="information" size={24} color="#2c3e50" />
-            <Text style={styles.cardTitle}>API Status</Text>
-          </View>
-          <Text style={styles.apiStatusText}>{apiStatus}</Text>
         </View>
       </ScrollView>
 
