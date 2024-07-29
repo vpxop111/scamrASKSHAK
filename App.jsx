@@ -1,7 +1,13 @@
 import React, {useState, useEffect, useRef} from 'react';
-import {PermissionsAndroid, ScrollView, Text, View} from 'react-native';
+import {
+  PermissionsAndroid,
+  ScrollView,
+  Text,
+  View,
+  StyleSheet,
+} from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
-import {supabase} from './supabase'; // Import Supabase client
+import {supabase} from './supabase';
 
 const App = () => {
   const [latestSms, setLatestSms] = useState('');
@@ -9,17 +15,20 @@ const App = () => {
   const [predictedResult, setPredictedResult] = useState('');
   const [timer, setTimer] = useState(20);
   const [apiStatus, setApiStatus] = useState('');
-  const [scamNumbers, setScamNumbers] = useState([]);
-  const [isScammer, setIsScammer] = useState(false);
-  const timerRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
+  const [scammerStatus, setScammerStatus] = useState({
+    isScammer: false,
+    checkedSender: null,
+    stored: false,
+  });
+  const timerRef = useRef(null);
+  const scammerCacheRef = useRef({});
 
   useEffect(() => {
     const initializeApp = async () => {
       await requestReadSmsPermission();
-      await fetchScamNumbers();
       startTimer();
     };
 
@@ -31,6 +40,26 @@ const App = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    const updateSenderDisplay = async () => {
+      if (smsSender) {
+        const isScam = await checkIfScammer(smsSender);
+        setSmsSender(prevSender =>
+          isScam
+            ? `${prevSender.replace(/ \(Scammer\)$/, '')} (Scammer)`
+            : prevSender.replace(/ \(Scammer\)$/, ''),
+        );
+        setScammerStatus(prev => ({
+          ...prev,
+          isScammer: isScam,
+          checkedSender: smsSender,
+        }));
+      }
+    };
+
+    updateSenderDisplay();
+  }, [smsSender]);
 
   const requestReadSmsPermission = async () => {
     try {
@@ -52,24 +81,6 @@ const App = () => {
     }
   };
 
-  const fetchScamNumbers = async () => {
-    try {
-      const {data, error} = await supabase.from('scammers').select('scam_no');
-      console.log('Supabase Response:', data, error);
-
-      if (error) {
-        console.error('Error fetching scam numbers:', error.message);
-        return;
-      }
-
-      const scamNumbers = data.map(item => item.scam_no);
-      console.log('Fetched scam numbers:', scamNumbers);
-      setScamNumbers(scamNumbers);
-    } catch (error) {
-      console.error('Error fetching scam numbers:', error.message);
-    }
-  };
-
   const readLatestSMS = () => {
     SmsAndroid.list(
       JSON.stringify({
@@ -88,20 +99,60 @@ const App = () => {
           const messageId = messages[0]._id;
           if (messageId !== lastProcessedSmsId) {
             setLatestSms(latestMessage);
-            setSmsSender(sender); // Set sender here
+            setSmsSender(sender);
             setLastProcessedSmsId(messageId);
-            checkIfScammer(sender); // Check after setting sender
           }
         }
       },
     );
   };
 
-  const checkIfScammer = sender => {
-    console.log('Current scamNumbers:', scamNumbers); // Log current scam numbers
-    const isScammer = scamNumbers.includes(sender);
-    setIsScammer(isScammer);
-    setSmsSender(isScammer ? `${sender} (Scammer)` : sender);
+  const checkIfScammer = async sender => {
+    console.log('Checking if sender is a scammer:', sender);
+
+    const cleanSender = sender.replace(/ \(Scammer\)$/, '');
+
+    if (cleanSender in scammerCacheRef.current) {
+      return scammerCacheRef.current[cleanSender];
+    }
+
+    try {
+      const {data, error} = await supabase.from('scammers').select('scam_no');
+
+      if (error) {
+        console.error('Error fetching scam numbers:', error.message);
+        return false;
+      }
+
+      if (!data || data.length === 0) {
+        console.log('No scam numbers found in the database');
+        return false;
+      }
+
+      const normalizedSender = cleanSender.replace(/\D/g, '');
+      const scamNumbers = data.map(item =>
+        String(item.scam_no).replace(/\D/g, ''),
+      );
+
+      const isScammer = scamNumbers.some(
+        number =>
+          normalizedSender.endsWith(number) ||
+          number.endsWith(normalizedSender),
+      );
+
+      scammerCacheRef.current[cleanSender] = isScammer;
+
+      console.log(
+        isScammer
+          ? `Scammer detected: ${cleanSender}`
+          : `Sender is not a scammer: ${cleanSender}`,
+      );
+
+      return isScammer;
+    } catch (error) {
+      console.error('Error in checkIfScammer:', error);
+      return false;
+    }
   };
 
   const startTimer = () => {
@@ -157,7 +208,10 @@ const App = () => {
       setApiStatus('API response received');
 
       if (result.toLowerCase() === 'scam') {
-        storeScamMessage(smsSender, latestSms);
+        const cleanSender = smsSender.replace(/ \(Scammer\)$/, '');
+        await storeScamMessage(cleanSender, message);
+        setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
+        scammerCacheRef.current[cleanSender] = true;
       }
     } catch (error) {
       console.error('Error sending message to API: ', error);
@@ -176,19 +230,19 @@ const App = () => {
         return;
       }
 
-      const {data, error: insertError} = await supabase
-        .from('scammers')
-        .insert([{scam_no: phoneNumber, scam_mes: message}]);
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
 
-      if (insertError) {
-        if (
-          insertError.message.includes(
-            'duplicate key value violates unique constraint',
-          )
-        ) {
-          console.log('Duplicate entry detected, no action needed.');
+      const {data, error} = await supabase
+        .from('scammers')
+        .insert([{scam_no: cleanPhoneNumber, scam_mes: message}]);
+
+      if (error) {
+        if (error.code === '23505') {
+          // Unique constraint violation
+          console.log('Scammer already exists in the database.');
+          // You might want to update the existing record here
         } else {
-          throw insertError;
+          throw error;
         }
       } else {
         console.log('Scam message successfully stored.');
@@ -210,7 +264,11 @@ const App = () => {
       {latestSms ? (
         <View style={styles.smsContainer}>
           <Text style={styles.smsTitle}>Latest SMS from:</Text>
-          <Text style={[styles.smsSender, isScammer && styles.scammer]}>
+          <Text
+            style={[
+              styles.smsSender,
+              scammerStatus.isScammer && styles.scammer,
+            ]}>
             {smsSender}
           </Text>
           <Text style={styles.smsTitle}>Latest SMS:</Text>
@@ -234,7 +292,6 @@ const App = () => {
     </ScrollView>
   );
 };
-import {StyleSheet} from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
