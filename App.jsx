@@ -5,9 +5,18 @@ import {
   Text,
   View,
   StyleSheet,
+  TouchableOpacity,
+  Modal,
+  SafeAreaView,
+  StatusBar,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 import {supabase} from './supabase';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+const {width} = Dimensions.get('window');
 
 const App = () => {
   const [latestSms, setLatestSms] = useState('');
@@ -23,6 +32,8 @@ const App = () => {
     checkedSender: null,
     stored: false,
   });
+  const [scamMessages, setScamMessages] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
   const timerRef = useRef(null);
   const scammerCacheRef = useRef({});
 
@@ -238,9 +249,7 @@ const App = () => {
 
       if (error) {
         if (error.code === '23505') {
-          // Unique constraint violation
           console.log('Scammer already exists in the database.');
-          // You might want to update the existing record here
         } else {
           throw error;
         }
@@ -252,6 +261,30 @@ const App = () => {
     }
   };
 
+  const fetchScamMessages = async phoneNumber => {
+    try {
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const {data, error} = await supabase
+        .from('scammers')
+        .select('scam_no, scam_mes')
+        .eq('scam_no', cleanPhoneNumber);
+
+      if (error) {
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        setScamMessages(data);
+        setModalVisible(true);
+      } else {
+        console.log('No scam messages found for this number');
+        // You might want to show a message to the user here
+      }
+    } catch (error) {
+      console.error('Error fetching scam messages:', error);
+    }
+  };
+
   useEffect(() => {
     if (!processing && latestSms && !isChecking) {
       sendMessageToApi(latestSms);
@@ -259,113 +292,209 @@ const App = () => {
   }, [processing, latestSms, isChecking]);
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>SMS Reader</Text>
-      {latestSms ? (
-        <View style={styles.smsContainer}>
-          <Text style={styles.smsTitle}>Latest SMS from:</Text>
-          <Text
-            style={[
-              styles.smsSender,
-              scammerStatus.isScammer && styles.scammer,
-            ]}>
-            {smsSender}
-          </Text>
-          <Text style={styles.smsTitle}>Latest SMS:</Text>
-          <Text style={styles.smsBody}>{latestSms}</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1e272e" />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Icon name="shield-check" size={30} color="#ffffff" />
+          <Text style={styles.title}>SMS Guard</Text>
         </View>
-      ) : null}
-      {predictedResult ? (
-        <View style={styles.responseContainer}>
-          <Text style={styles.responseTitle}>API Response:</Text>
-          <Text style={styles.responseBody}>{predictedResult}</Text>
+        {latestSms ? (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Icon name="message-text" size={24} color="#2c3e50" />
+              <Text style={styles.cardTitle}>Latest SMS</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() =>
+                scammerStatus.isScammer && fetchScamMessages(smsSender)
+              }>
+              <Text
+                style={[
+                  styles.smsSender,
+                  scammerStatus.isScammer && styles.scammer,
+                ]}>
+                From: {smsSender}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.smsBody}>{latestSms}</Text>
+          </View>
+        ) : null}
+        {predictedResult ? (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Icon name="chart-bubble" size={24} color="#2c3e50" />
+              <Text style={styles.cardTitle}>AI Prediction</Text>
+            </View>
+            <Text
+              style={[
+                styles.predictionResult,
+                predictedResult.toLowerCase() === 'scam' && styles.scamResult,
+              ]}>
+              {predictedResult}
+            </Text>
+          </View>
+        ) : null}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Icon name="timer" size={24} color="#2c3e50" />
+            <Text style={styles.cardTitle}>Next Check</Text>
+          </View>
+          <Text style={styles.timerText}>{timer} seconds</Text>
         </View>
-      ) : null}
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerTitle}>Timer:</Text>
-        <Text style={styles.timerBody}>{timer}</Text>
-      </View>
-      <View style={styles.apiStatusContainer}>
-        <Text style={styles.apiStatusTitle}>API Status:</Text>
-        <Text style={styles.apiStatusBody}>{apiStatus}</Text>
-      </View>
-    </ScrollView>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Icon name="information" size={24} color="#2c3e50" />
+            <Text style={styles.cardTitle}>API Status</Text>
+          </View>
+          <Text style={styles.apiStatusText}>{apiStatus}</Text>
+        </View>
+      </ScrollView>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Scam Messages</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Icon name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              {scamMessages.map((item, index) => (
+                <View key={index} style={styles.modalMessageContainer}>
+                  <Text style={styles.modalMessageNumber}>
+                    Number: {item.scam_no}
+                  </Text>
+                  <Text style={styles.modalMessage}>{item.scam_mes}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Removed the loader overlay */}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#1e272e',
+  },
+  scrollContent: {
     padding: 20,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    color: '#ffffff',
+    marginLeft: 10,
   },
-  smsContainer: {
+  card: {
     backgroundColor: '#ffffff',
-    padding: 15,
     borderRadius: 10,
+    padding: 20,
     marginBottom: 20,
+    elevation: 3,
   },
-  smsTitle: {
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    color: '#2c3e50',
+    marginLeft: 10,
   },
   smsSender: {
     fontSize: 16,
     marginBottom: 10,
+    color: '#34495e',
   },
   scammer: {
-    color: 'red',
+    color: '#e74c3c',
     fontWeight: 'bold',
   },
   smsBody: {
     fontSize: 16,
+    color: '#34495e',
   },
-  responseContainer: {
-    backgroundColor: '#e6f7ff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  responseTitle: {
+  predictionResult: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    color: '#27ae60',
   },
-  responseBody: {
+  scamResult: {
+    color: '#e74c3c',
+  },
+  timerText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#3498db',
+  },
+  apiStatusText: {
     fontSize: 16,
+    color: '#34495e',
   },
-  timerContainer: {
-    flexDirection: 'row',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalView: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: width * 0.9,
+    maxHeight: '80%',
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    backgroundColor: '#3498db',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 15,
   },
-  timerTitle: {
-    fontSize: 18,
+  modalTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#ffffff',
   },
-  timerBody: {
-    fontSize: 18,
+  modalScroll: {
+    padding: 15,
   },
-  apiStatusContainer: {
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 5,
+  modalMessageContainer: {
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+    paddingBottom: 15,
   },
-  apiStatusTitle: {
+  modalMessageNumber: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#2c3e50',
     marginBottom: 5,
   },
-  apiStatusBody: {
+  modalMessage: {
     fontSize: 14,
+    color: '#34495e',
   },
 });
 
