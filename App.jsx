@@ -4,18 +4,40 @@ import {
   ScrollView,
   Text,
   View,
-  StyleSheet,
   TouchableOpacity,
   Modal,
   SafeAreaView,
   StatusBar,
   Dimensions,
+  Alert,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 import {supabase} from './supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import CallDetectorManager from 'react-native-call-detection';
 
 const {width} = Dimensions.get('window');
+
+const fetchScamDetails = async phoneNumber => {
+  try {
+    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+    const {data, error} = await supabase
+      .from('scammers')
+      .select('scam_no, scam_mes')
+      .eq('scam_no', cleanPhoneNumber)
+      .single();
+
+    if (error) {
+      console.error('Error fetching scam details:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in fetchScamDetails:', error);
+    return null;
+  }
+};
 
 const App = () => {
   const [latestSms, setLatestSms] = useState('');
@@ -33,6 +55,8 @@ const App = () => {
   });
   const [scamMessages, setScamMessages] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [incomingCallNumber, setIncomingCallNumber] = useState('');
+  const [isIncomingCallScammer, setIsIncomingCallScammer] = useState(false);
   const timerRef = useRef(null);
   const scammerCacheRef = useRef({});
 
@@ -70,6 +94,74 @@ const App = () => {
 
     updateSenderDisplay();
   }, [smsSender]);
+  const fetchCallScamDetails = async phoneNumber => {
+    try {
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const {data, error} = await supabase
+        .from('scammers')
+        .select('scam_no, scam_mes')
+        .eq('scam_no', cleanPhoneNumber);
+
+      if (error) {
+        console.error('Error fetching call scam details:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in fetchCallScamDetails:', error);
+      return null;
+    }
+  };
+  useEffect(() => {
+    let callDetector;
+
+    const setupCallDetector = async () => {
+      try {
+        callDetector = new CallDetectorManager(
+          async (event, number) => {
+            if (event === 'Incoming') {
+              console.log('Incoming call from:', number);
+              const scamDetails = await fetchCallScamDetails(number);
+              if (scamDetails && scamDetails.length > 0) {
+                console.log('Scammer detected:', number);
+                Alert.alert(
+                  'Scam Call Detected',
+                  `Number: ${scamDetails[0].scam_no}\nMessage: ${scamDetails[0].scam_mes}`,
+                  [{text: 'OK', onPress: () => console.log('Alert closed')}],
+                  {cancelable: false},
+                );
+              } else {
+                Alert.alert(
+                  'Incoming Call',
+                  `Incoming call from: ${number}`,
+                  [{text: 'OK', onPress: () => console.log('Alert closed')}],
+                  {cancelable: false},
+                );
+              }
+            }
+          },
+          true,
+          () => {
+            console.log('Call Detector is initialized successfully');
+          },
+          err => {
+            console.error('Call Detector failed to initialize', err);
+          },
+        );
+      } catch (error) {
+        console.error('Error setting up Call Detector:', error);
+      }
+    };
+
+    setupCallDetector();
+
+    return () => {
+      if (callDetector) {
+        callDetector.dispose();
+      }
+    };
+  }, []);
 
   const requestReadSmsPermission = async () => {
     try {
@@ -127,29 +219,8 @@ const App = () => {
     }
 
     try {
-      const {data, error} = await supabase.from('scammers').select('scam_no');
-
-      if (error) {
-        console.error('Error fetching scam numbers:', error.message);
-        return false;
-      }
-
-      if (!data || data.length === 0) {
-        console.log('No scam numbers found in the database');
-        return false;
-      }
-
-      const normalizedSender = cleanSender.replace(/\D/g, '');
-      const scamNumbers = data.map(item =>
-        String(item.scam_no).replace(/\D/g, ''),
-      );
-
-      const isScammer = scamNumbers.some(
-        number =>
-          normalizedSender.endsWith(number) ||
-          number.endsWith(normalizedSender),
-      );
-
+      const scamDetails = await fetchScamDetails(cleanSender);
+      const isScammer = !!scamDetails;
       scammerCacheRef.current[cleanSender] = isScammer;
 
       console.log(
@@ -277,10 +348,14 @@ const App = () => {
         setModalVisible(true);
       } else {
         console.log('No scam messages found for this number');
-        // You might want to show a message to the user here
+        Alert.alert(
+          'No Scam Messages',
+          'No scam messages found for this number.',
+        );
       }
     } catch (error) {
       console.error('Error fetching scam messages:', error);
+      Alert.alert('Error', 'Failed to fetch scam messages. Please try again.');
     }
   };
 
@@ -289,7 +364,6 @@ const App = () => {
       sendMessageToApi(latestSms);
     }
   }, [processing, latestSms, isChecking]);
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1e272e" />
@@ -298,6 +372,20 @@ const App = () => {
           <Icon name="shield-check" size={30} color="#ffffff" />
           <Text style={styles.title}>SMS Guard</Text>
         </View>
+
+        {incomingCallNumber ? (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Icon name="phone" size={24} color="#2c3e50" />
+              <Text style={styles.cardTitle}>Incoming Call</Text>
+            </View>
+            <Text style={styles.smsSender}>
+              From: {incomingCallNumber} {isIncomingCallScammer && '(Scammer)'}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Existing SMS and Prediction Display Code */}
         {latestSms ? (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -319,6 +407,7 @@ const App = () => {
             <Text style={styles.smsBody}>{latestSms}</Text>
           </View>
         ) : null}
+
         {predictedResult ? (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -334,6 +423,7 @@ const App = () => {
             </Text>
           </View>
         ) : null}
+
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Icon name="timer" size={24} color="#2c3e50" />
@@ -342,38 +432,10 @@ const App = () => {
           <Text style={styles.timerText}>{timer} seconds</Text>
         </View>
       </ScrollView>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalView}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Scam Messages</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Icon name="close" size={24} color="#ffffff" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScroll}>
-              {scamMessages.map((item, index) => (
-                <View key={index} style={styles.modalMessageContainer}>
-                  <Text style={styles.modalMessageNumber}>
-                    Number: {item.scam_no}
-                  </Text>
-                  <Text style={styles.modalMessage}>{item.scam_mes}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Removed the loader overlay */}
     </SafeAreaView>
   );
 };
+import {StyleSheet} from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
@@ -449,43 +511,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalView: {
+    width: width * 0.8,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    width: width * 0.9,
-    maxHeight: '80%',
+    borderRadius: 10,
+    padding: 20,
     elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#3498db',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 15,
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#2c3e50',
   },
   modalScroll: {
-    padding: 15,
+    maxHeight: 300,
   },
   modalMessageContainer: {
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-    paddingBottom: 15,
+    marginBottom: 10,
   },
   modalMessageNumber: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 5,
+    color: '#34495e',
   },
   modalMessage: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#34495e',
   },
 });
