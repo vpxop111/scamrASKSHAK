@@ -1,9 +1,10 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {
-  PermissionsAndroid,
-  ScrollView,
+  StyleSheet,
   Text,
   View,
+  PermissionsAndroid,
+  ScrollView,
   TouchableOpacity,
   Modal,
   SafeAreaView,
@@ -13,8 +14,8 @@ import {
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 import {supabase} from './supabase';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CallDetectorManager from 'react-native-call-detection';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const {width} = Dimensions.get('window');
 
@@ -94,25 +95,7 @@ const App = () => {
 
     updateSenderDisplay();
   }, [smsSender]);
-  const fetchCallScamDetails = async phoneNumber => {
-    try {
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-      const {data, error} = await supabase
-        .from('scammers')
-        .select('scam_no, scam_mes')
-        .eq('scam_no', cleanPhoneNumber);
 
-      if (error) {
-        console.error('Error fetching call scam details:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in fetchCallScamDetails:', error);
-      return null;
-    }
-  };
   useEffect(() => {
     let callDetector;
 
@@ -122,16 +105,20 @@ const App = () => {
           async (event, number) => {
             if (event === 'Incoming') {
               console.log('Incoming call from:', number);
-              const scamDetails = await fetchCallScamDetails(number);
-              if (scamDetails && scamDetails.length > 0) {
+              const scamDetails = await fetchScamDetails(number);
+              if (scamDetails) {
                 console.log('Scammer detected:', number);
+                setIncomingCallNumber(number);
+                setIsIncomingCallScammer(true);
                 Alert.alert(
                   'Scam Call Detected',
-                  `Number: ${scamDetails[0].scam_no}\nMessage: ${scamDetails[0].scam_mes}`,
+                  `Number: ${scamDetails.scam_no}\nMessage: ${scamDetails.scam_mes}`,
                   [{text: 'OK', onPress: () => console.log('Alert closed')}],
                   {cancelable: false},
                 );
               } else {
+                setIncomingCallNumber(number);
+                setIsIncomingCallScammer(false);
                 Alert.alert(
                   'Incoming Call',
                   `Incoming call from: ${number}`,
@@ -364,6 +351,7 @@ const App = () => {
       sendMessageToApi(latestSms);
     }
   }, [processing, latestSms, isChecking]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1e272e" />
@@ -385,7 +373,6 @@ const App = () => {
           </View>
         ) : null}
 
-        {/* Existing SMS and Prediction Display Code */}
         {latestSms ? (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -432,10 +419,36 @@ const App = () => {
           <Text style={styles.timerText}>{timer} seconds</Text>
         </View>
       </ScrollView>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Scam History</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Icon name="close" size={24} color="#2c3e50" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              {scamMessages.map((message, index) => (
+                <View key={index} style={styles.modalMessageContainer}>
+                  <Text style={styles.modalMessageNumber}>
+                    {message.scam_no}
+                  </Text>
+                  <Text style={styles.modalMessage}>{message.scam_mes}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
-import {StyleSheet} from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
