@@ -1,164 +1,257 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
-  StyleSheet,
-  Text,
   View,
-  PermissionsAndroid,
-  ScrollView,
+  Text,
   TouchableOpacity,
-  Modal,
-  SafeAreaView,
-  StatusBar,
-  Dimensions,
   Alert,
+  StyleSheet,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  Modal,
 } from 'react-native';
-import SmsAndroid from 'react-native-get-sms-android';
+import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import {supabase} from './supabase';
-import CallDetectorManager from 'react-native-call-detection';
-const {width} = Dimensions.get('window');
 
-const fetchScamDetails = async phoneNumber => {
-  try {
-    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-    const {data, error} = await supabase
-      .from('scammers')
-      .select('scam_no, scam_mes')
-      .eq('scam_no', cleanPhoneNumber)
-      .single();
-
-    if (error) {
-      console.error('Error fetching scam details:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in fetchScamDetails:', error);
-    return null;
-  }
-};
+const WEB_CLIENT_ID =
+  '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
+const ANDROID_CLIENT_ID =
+  '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
 
 const App = () => {
-  const [latestSms, setLatestSms] = useState('');
-  const [smsSender, setSmsSender] = useState('');
-  const [predictedResult, setPredictedResult] = useState('');
-  const [timer, setTimer] = useState(20);
-  const [apiStatus, setApiStatus] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
+  const [isSigninInProgress, setIsSigninInProgress] = useState(false);
+  const [latestEmail, setLatestEmail] = useState(null);
+  const [latestEmailId, setLatestEmailId] = useState(null);
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [confidence, setConfidence] = useState(null);
+  const [timer, setTimer] = useState(60);
+  const [isLoading, setIsLoading] = useState(false);
   const [scammerStatus, setScammerStatus] = useState({
     isScammer: false,
     checkedSender: null,
     stored: false,
   });
-  const [scamMessages, setScamMessages] = useState([]);
+  const [scamEmails, setScamEmails] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const timerRef = useRef(null);
   const scammerCacheRef = useRef({});
 
   useEffect(() => {
-    const initializeApp = async () => {
-      await requestReadSmsPermission();
-      startTimer();
-    };
-
-    initializeApp();
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
+    configureGoogleSignin();
   }, []);
 
   useEffect(() => {
-    const updateSenderDisplay = async () => {
-      if (smsSender) {
-        const isScam = await checkIfScammer(smsSender);
-        setSmsSender(prevSender =>
-          isScam
-            ? `${prevSender.replace(/ \(Scammer\)$/, '')} (Scammer)`
-            : prevSender.replace(/ \(Scammer\)$/, ''),
-        );
-        setScammerStatus(prev => ({
-          ...prev,
-          isScammer: isScam,
-          checkedSender: smsSender,
-        }));
-      }
-    };
+    if (userInfo) {
+      fetchLatestEmail();
+      const interval = setInterval(() => {
+        setTimer(prevTimer => (prevTimer > 0 ? prevTimer - 1 : 60));
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [userInfo]);
 
-    updateSenderDisplay();
-  }, [smsSender]);
+  useEffect(() => {
+    if (timer === 0 && userInfo) {
+      fetchLatestEmail();
+    }
+  }, [timer, userInfo]);
 
-  const requestReadSmsPermission = async () => {
+  const configureGoogleSignin = async () => {
     try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_SMS,
-        {
-          title: 'Read SMS Permission',
-          message: 'This app needs access to your SMS messages to read them.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        },
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        readLatestSMS();
-      }
-    } catch (err) {
-      console.warn(err);
+      await GoogleSignin.configure({
+        offlineAccess: true,
+        webClientId: WEB_CLIENT_ID,
+        androidClientId: ANDROID_CLIENT_ID,
+        scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+      });
+      console.log('GoogleSignin configured successfully');
+    } catch (error) {
+      console.error('Error configuring Google Sign-In:', error);
     }
   };
-  useEffect(() => {
-    requestReadSmsPermission();
-  }, []);
 
-  const readLatestSMS = () => {
-    SmsAndroid.list(
-      JSON.stringify({
-        box: 'inbox',
-        indexFrom: 0,
-        maxCount: 1,
-      }),
-      fail => {
-        console.log('Failed with this error: ' + fail);
-      },
-      (count, smsList) => {
-        const messages = JSON.parse(smsList);
-        if (messages.length > 0) {
-          const latestMessage = messages[0].body;
-          const sender = messages[0].address;
-          const messageId = messages[0]._id;
-          if (messageId !== lastProcessedSmsId) {
-            setLatestSms(latestMessage);
-            setSmsSender(sender);
-            setLastProcessedSmsId(messageId);
-          }
+  const signIn = async () => {
+    if (isSigninInProgress) return;
+
+    setIsSigninInProgress(true);
+    console.log('Sign-in in progress...');
+    try {
+      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
+      const userInfo = await GoogleSignin.signIn();
+      setUserInfo(userInfo);
+    } catch (error) {
+      console.error('ERROR IS: ' + JSON.stringify(error));
+      Alert.alert(
+        'Sign-In Error',
+        'An error occurred during sign-in. Please try again.',
+      );
+    } finally {
+      setIsSigninInProgress(false);
+      console.log('Sign-in progress reset');
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await GoogleSignin.revokeAccess();
+      await GoogleSignin.signOut();
+      setUserInfo(null);
+      setLatestEmail(null);
+      setLatestEmailId(null);
+      setEmailStatus(null);
+      setConfidence(null);
+    } catch (error) {
+      console.error('Sign out error:', error);
+      Alert.alert('An error occurred while signing out');
+    }
+  };
+
+  const fetchLatestEmail = useCallback(async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    try {
+      const {accessToken} = await GoogleSignin.getTokens();
+      const response = await fetch(
+        'https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=1',
+        {
+          headers: {Authorization: `Bearer ${accessToken}`},
+        },
+      );
+      const data = await response.json();
+      if (data.messages && data.messages.length > 0) {
+        const messageId = data.messages[0].id;
+        if (messageId !== latestEmailId) {
+          setLatestEmailId(messageId);
+          const messageResponse = await fetch(
+            `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}`,
+            {
+              headers: {Authorization: `Bearer ${accessToken}`},
+            },
+          );
+          const messageData = await messageResponse.json();
+          setLatestEmail(messageData);
+          sendEmailToApi(messageData);
         }
-      },
-    );
+      }
+    } catch (error) {
+      console.error('Error fetching latest email:', error);
+      Alert.alert('Error', 'Failed to fetch the latest email');
+    } finally {
+      setIsLoading(false);
+      setTimer(60);
+    }
+  }, [latestEmailId, isLoading]);
+
+  const base64UrlDecode = str => {
+    try {
+      return decodeURIComponent(
+        atob(str.replace(/-/g, '+').replace(/_/g, '/'))
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(''),
+      );
+    } catch (error) {
+      console.error('Error decoding Base64 string:', error);
+      return 'Error decoding body';
+    }
+  };
+
+  const sendEmailToApi = async email => {
+    const subject =
+      email.payload.headers.find(
+        header => header.name.toLowerCase() === 'subject',
+      )?.value || 'No subject';
+    const bodyPart = email.payload.parts
+      ? email.payload.parts.find(part => part.mimeType === 'text/plain')?.body
+          ?.data
+      : email.snippet;
+
+    const body = bodyPart ? base64UrlDecode(bodyPart) : 'No body';
+    const sender =
+      email.payload.headers.find(header => header.name.toLowerCase() === 'from')
+        ?.value || 'Unknown sender';
+
+    const emailData = {subject, body};
+
+    try {
+      const response = await fetch(
+        'https://varun324242-gmail.hf.space/predict',
+        {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(emailData),
+        },
+      );
+      const result = await response.json();
+      console.log('API Response:', result);
+      setEmailStatus(result.predicted_result);
+      setConfidence(result.confidence);
+
+      if (result.predicted_result.toLowerCase() === 'scam') {
+        await storeScamEmail(sender, subject, body);
+        setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
+        scammerCacheRef.current[sender] = true;
+      }
+
+      const isScam = await checkIfScammer(sender);
+      setScammerStatus(prev => ({
+        ...prev,
+        isScammer: isScam,
+        checkedSender: sender,
+      }));
+    } catch (error) {
+      console.error('Error sending email to API:', error);
+      setEmailStatus('Error classifying email');
+      setConfidence(null);
+    }
+  };
+
+  const storeScamEmail = async (sender, subject, body) => {
+    try {
+      const {data, error} = await supabase
+        .from('Gmailss')
+        .insert([{scam_email: sender, scam_subject: subject, scam_body: body}]);
+
+      if (error) {
+        if (error.code === '23505') {
+          console.log('Scammer email already exists in the database.');
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('Scam email successfully stored.');
+      }
+    } catch (error) {
+      console.error('Error storing scam email in Supabase: ', error);
+    }
   };
 
   const checkIfScammer = async sender => {
     console.log('Checking if sender is a scammer:', sender);
 
-    const cleanSender = sender.replace(/ \(Scammer\)$/, '');
-
-    if (cleanSender in scammerCacheRef.current) {
-      return scammerCacheRef.current[cleanSender];
+    if (sender in scammerCacheRef.current) {
+      return scammerCacheRef.current[sender];
     }
 
     try {
-      const scamDetails = await fetchScamDetails(cleanSender);
-      const isScammer = !!scamDetails;
-      scammerCacheRef.current[cleanSender] = isScammer;
+      const {data, error} = await supabase
+        .from('Gmailss')
+        .select('scam_email')
+        .eq('scam_email', sender)
+        .single();
+
+      if (error) {
+        console.error('Error checking scammer status:', error);
+        return false;
+      }
+
+      const isScammer = !!data;
+      scammerCacheRef.current[sender] = isScammer;
 
       console.log(
         isScammer
-          ? `Scammer detected: ${cleanSender}`
-          : `Sender is not a scammer: ${cleanSender}`,
+          ? `Scammer detected: ${sender}`
+          : `Sender is not a scammer: ${sender}`,
       );
 
       return isScammer;
@@ -168,171 +261,122 @@ const App = () => {
     }
   };
 
-  const startTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    setTimer(20);
-    timerRef.current = setInterval(() => {
-      setTimer(prevTimer => {
-        if (prevTimer === 1) {
-          checkForNewMessage();
-          return 20;
-        }
-        return prevTimer - 1;
-      });
-    }, 1000);
-  };
-
-  const checkForNewMessage = () => {
-    if (!processing && !isChecking) {
-      setIsChecking(true);
-      readLatestSMS();
-    }
-  };
-
-  const sendMessageToApi = async message => {
-    if (!message) {
-      setIsChecking(false);
-      return;
-    }
-
-    setProcessing(true);
-    setApiStatus('Sending message to API...');
+  const fetchScamEmails = async sender => {
     try {
-      const response = await fetch(
-        'https://varun324242-sssssss.hf.space/predict',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({message}),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const data = await response.json();
-      const result = data.predicted_result || 'No result found';
-      setPredictedResult(result);
-      setApiStatus('API response received');
-
-      if (result.toLowerCase() === 'scam') {
-        const cleanSender = smsSender.replace(/ \(Scammer\)$/, '');
-        await storeScamMessage(cleanSender, message);
-        setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
-        scammerCacheRef.current[cleanSender] = true;
-      }
-    } catch (error) {
-      console.error('Error sending message to API: ', error);
-      setPredictedResult('Error sending message to API');
-      setApiStatus('Error sending message to API');
-    } finally {
-      setProcessing(false);
-      setIsChecking(false);
-    }
-  };
-
-  const storeScamMessage = async (phoneNumber, message) => {
-    try {
-      if (typeof phoneNumber !== 'string') {
-        console.error('Invalid phone number type');
-        return;
-      }
-
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-
       const {data, error} = await supabase
-        .from('scammers')
-        .insert([{scam_no: cleanPhoneNumber, scam_mes: message}]);
-
-      if (error) {
-        if (error.code === '23505') {
-          console.log('Scammer already exists in the database.');
-        } else {
-          throw error;
-        }
-      } else {
-        console.log('Scam message successfully stored.');
-      }
-    } catch (error) {
-      console.error('Error storing scam message in Supabase: ', error);
-    }
-  };
-
-  const fetchScamMessages = async phoneNumber => {
-    try {
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-      const {data, error} = await supabase
-        .from('scammers')
-        .select('scam_no, scam_mes')
-        .eq('scam_no', cleanPhoneNumber);
+        .from('Gmailss')
+        .select('scam_email, scam_subject, scam_body')
+        .eq('scam_email', sender);
 
       if (error) {
         throw error;
       }
 
       if (data && data.length > 0) {
-        setScamMessages(data);
+        setScamEmails(data);
         setModalVisible(true);
       } else {
-        console.log('No scam messages found for this number');
-        Alert.alert(
-          'No Scam Messages',
-          'No scam messages found for this number.',
-        );
+        console.log('No scam emails found for this sender');
+        Alert.alert('No Scam Emails', 'No scam emails found for this sender.');
       }
     } catch (error) {
-      console.error('Error fetching scam messages:', error);
-      Alert.alert('Error', 'Failed to fetch scam messages. Please try again.');
+      console.error('Error fetching scam emails:', error);
+      Alert.alert('Error', 'Failed to fetch scam emails. Please try again.');
     }
   };
 
-  useEffect(() => {
-    if (!processing && latestSms && !isChecking) {
-      sendMessageToApi(latestSms);
-    }
-  }, [processing, latestSms, isChecking]);
+  const renderEmailSubject = () => {
+    if (!latestEmail) return null;
+    const subject = latestEmail.payload.headers.find(
+      header => header.name.toLowerCase() === 'subject',
+    );
+    return subject ? subject.value : 'No subject';
+  };
+
+  const renderEmailSender = () => {
+    if (!latestEmail) return null;
+    const sender = latestEmail.payload.headers.find(
+      header => header.name.toLowerCase() === 'from',
+    );
+    return sender ? sender.value : 'Unknown sender';
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView style={styles.scrollView}>
+      <ScrollView contentContainerStyle={styles.scrollView}>
         <View style={styles.container}>
-          <Text style={styles.title}>SMS Scam Detector</Text>
-          {latestSms ? (
-            <View style={styles.smsContainer}>
-              <Text style={styles.smsTitle}>Latest SMS from:</Text>
-              <View style={styles.senderContainer}>
-                <Text style={styles.smsSender}>
-                  {smsSender.replace(/ \(Scammer\)$/, '')}
+          {!userInfo ? (
+            <TouchableOpacity
+              style={styles.signInButton}
+              onPress={signIn}
+              disabled={isSigninInProgress}>
+              <Text style={styles.buttonText}>Sign in with Google</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.loggedInContainer}>
+              <Text style={styles.loggedInText}>
+                Logged in as: {userInfo.user.email}
+              </Text>
+              <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+                <Text style={styles.buttonText}>Sign out</Text>
+              </TouchableOpacity>
+              {latestEmail ? (
+                <View style={styles.emailContainer}>
+                  <Text style={styles.emailTitle}>Latest Email:</Text>
+                  <Text style={styles.subject}>
+                    Subject: {renderEmailSubject()}
+                  </Text>
+                  <Text style={styles.sender}>
+                    From: {renderEmailSender()}
+                    {scammerStatus.isScammer &&
+                      scammerStatus.checkedSender === renderEmailSender() &&
+                      ' (Scammer)'}
+                  </Text>
+                  {emailStatus && (
+                    <View style={styles.statusContainer}>
+                      <Text style={styles.emailTitle}>Classification:</Text>
+                      <Text
+                        style={[
+                          styles.status,
+                          emailStatus === 'Scam' ? styles.scam : styles.ham,
+                        ]}>
+                        {emailStatus}
+                      </Text>
+                      {confidence !== null && (
+                        <Text style={styles.confidence}>
+                          Confidence: {(confidence * 100).toFixed(2)}%
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.checkScamButton}
+                    onPress={() => fetchScamEmails(renderEmailSender())}
+                    activeOpacity={0.7}>
+                    <Text style={styles.buttonText}>Check Scam History</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={styles.fetchingText}>
+                  Fetching latest email...
                 </Text>
-                {scammerStatus.isScammer && (
-                  <Text style={styles.scammerLabel}> (Scammer)</Text>
-                )}
+              )}
+              <View style={styles.timerContainer}>
+                <Text style={styles.timerText}>Next update in: {timer}s</Text>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={fetchLatestEmail}
+                  disabled={isLoading}
+                  activeOpacity={0.7}>
+                  {isLoading ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Refresh</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-              <Text style={styles.smsTitle}>Latest SMS:</Text>
-              <Text style={styles.smsBody}>{latestSms}</Text>
             </View>
-          ) : null}
-          {predictedResult ? (
-            <View style={styles.responseContainer}>
-              <Text style={styles.responseTitle}>API Response:</Text>
-              <Text style={styles.responseBody}>{predictedResult}</Text>
-            </View>
-          ) : null}
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerTitle}>Next check in:</Text>
-            <Text style={styles.timerBody}>{timer} seconds</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => fetchScamMessages(smsSender)}>
-            <Text style={styles.buttonText}>View Scam History</Text>
-          </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
       <Modal
@@ -342,17 +386,23 @@ const App = () => {
         onRequestClose={() => setModalVisible(false)}>
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>Scam History</Text>
-            {scamMessages.map((msg, index) => (
-              <View key={index} style={styles.scamMessageContainer}>
-                <Text style={styles.scamMessageNumber}>{msg.scam_no}</Text>
-                <Text style={styles.scamMessageText}>{msg.scam_mes}</Text>
-              </View>
-            ))}
+            <Text style={styles.modalTitle}>Scam Email History</Text>
+            <ScrollView>
+              {scamEmails.map((email, index) => (
+                <View key={index} style={styles.scamEmailItem}>
+                  <Text style={styles.scamEmailSubject}>
+                    {email.scam_subject}
+                  </Text>
+                  <Text style={styles.scamEmailSender}>{email.scam_email}</Text>
+                  <Text style={styles.scamEmailBody}>{email.scam_body}</Text>
+                </View>
+              ))}
+            </ScrollView>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeButtonText}>Close</Text>
+              onPress={() => setModalVisible(false)}
+              activeOpacity={0.7}>
+              <Text style={styles.buttonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -364,96 +414,131 @@ const App = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f0f0',
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 1,
   },
   container: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
+  },
+  loggedInContainer: {
+    width: '100%',
     alignItems: 'center',
   },
-  title: {
+  loggedInText: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#333',
+  },
+  signInButton: {
+    backgroundColor: '#4285F4',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  signOutButton: {
+    backgroundColor: '#DB4437',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emailContainer: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  emailTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  subject: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#666',
+  },
+  sender: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#666',
+  },
+  statusContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 5,
+    padding: 10,
+  },
+  status: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-  },
-  smsContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    width: '100%',
-  },
-  smsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    textAlign: 'center',
     marginBottom: 5,
-    color: '#555',
   },
-  senderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  scam: {
+    color: '#D32F2F',
   },
-  smsSender: {
-    fontSize: 18,
-    marginBottom: 10,
-    color: '#333',
+  ham: {
+    color: '#388E3C',
   },
-  scammerLabel: {
-    fontSize: 18,
-    marginBottom: 10,
-    color: 'red',
-    fontWeight: 'bold',
-  },
-  smsBody: {
+  confidence: {
     fontSize: 16,
-    color: '#444',
+    textAlign: 'center',
+    color: '#666',
   },
-  responseContainer: {
-    backgroundColor: '#e6f7ff',
-    borderRadius: 10,
-    padding: 15,
+  fetchingText: {
+    fontSize: 16,
+    color: '#666',
     marginBottom: 20,
-    width: '100%',
-  },
-  responseTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#0066cc',
-  },
-  responseBody: {
-    fontSize: 18,
-    color: '#333',
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    padding: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  timerTitle: {
+  timerText: {
     fontSize: 16,
-    marginRight: 10,
-    color: '#555',
-  },
-  timerBody: {
-    fontSize: 18,
-    fontWeight: 'bold',
     color: '#333',
   },
-  button: {
+  refreshButton: {
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
     borderRadius: 5,
+    padding: 10,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  checkScamButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: 'center',
   },
   centeredView: {
     flex: 1,
@@ -462,6 +547,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalView: {
+    margin: 20,
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 35,
@@ -474,26 +560,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    maxHeight: '80%',
     width: '90%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
   },
-  scamMessageContainer: {
-    marginBottom: 10,
-    width: '100%',
+  scamEmailItem: {
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    paddingBottom: 10,
   },
-  scamMessageNumber: {
+  scamEmailSubject: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#0066cc',
   },
-  scamMessageText: {
+  scamEmailSender: {
     fontSize: 14,
-    color: '#444',
+    color: '#666',
+  },
+  scamEmailBody: {
+    fontSize: 14,
+    marginTop: 5,
   },
   closeButton: {
     backgroundColor: '#2196F3',
@@ -501,11 +592,6 @@ const styles = StyleSheet.create({
     padding: 10,
     elevation: 2,
     marginTop: 15,
-  },
-  closeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
 });
 

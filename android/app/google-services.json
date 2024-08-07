@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "474369294841",
+    "project_id": "linkedin-clone-d873d",
+    "storage_bucket": "linkedin-clone-d873d.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:474369294841:android:ec4cdb85d447f0e777fd28",
+        "android_client_info": {
+          "package_name": "com.awesomeproject"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "474369294841-lb6tmiumdsjettfl2ghb3ut6rqq7kbg6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.awesomeproject",
+            "certificate_hash": "af3ed5c9858915ed644f2dd35d49af1a3a17608e"
+          }
+        },
+        {
+          "client_id": "474369294841-5u5oem81vos287p9t29n78hbjjv4jct1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7hnSN4RbQb0B0gOEaPjr-LaLGV8zjdhM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "474369294841-5u5oem81vos287p9t29n78hbjjv4jct1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "474369294841-1o6ppriqq4tml5ivaqiharp99ovd37qd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.scamsafe11"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
