@@ -10,6 +10,8 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
+import com.transistorsoft.rnbackgroundfetch.RNBackgroundFetchPackage
+import com.dieam.reactnativepushnotification.ReactNativePushNotificationPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -17,8 +19,9 @@ class MainApplication : Application(), ReactApplication {
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
+              // Manually add packages that cannot be auto-linked
+              add(RNBackgroundFetchPackage()) // Add Background Fetch package
+              add(ReactNativePushNotificationPackage()) // Add Push Notification package
             }
 
         override fun getJSMainModuleName(): String = "index"
