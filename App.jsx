@@ -23,7 +23,6 @@ const WEB_CLIENT_ID =
 const ANDROID_CLIENT_ID =
   '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
 
-// Configure PushNotification
 PushNotification.configure({
   onRegister: function (token) {
     console.log('TOKEN:', token);
@@ -66,65 +65,58 @@ const App = () => {
     configureGoogleSignin();
     checkAndStartBackgroundTask();
 
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onBackPress,
+    );
     const appStateSubscription = AppState.addEventListener(
       'change',
-      nextAppState => {
-        if (nextAppState === 'active') {
-          checkAndStartBackgroundTask();
-        }
-      },
+      handleAppStateChange,
     );
 
     return () => {
+      backHandler.remove();
       appStateSubscription.remove();
     };
   }, []);
 
-  useEffect(() => {
-    const onBackPress = () => {
-      if (isTaskRunning) {
-        // Prevent going back if the task is running
-        return true;
-      }
-      return false;
-    };
-
-    BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-    return () => {
-      BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    };
-  }, [isTaskRunning]);
-
-  useEffect(() => {
-    let interval;
-    if (userInfo && !isLoading) {
-      interval = setInterval(() => {
-        setTimer(prevTimer => {
-          if (prevTimer === 1) {
-            fetchLatestEmail();
-            return 60;
-          }
-          return prevTimer - 1;
-        });
-      }, 1000);
+  const onBackPress = () => {
+    if (isTaskRunning) {
+      Alert.alert(
+        'Background Task Running',
+        'The background task is still running. Do you want to stop it and exit?',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Stop and Exit',
+            onPress: async () => {
+              await stopTask();
+              BackHandler.exitApp();
+            },
+          },
+        ],
+      );
+      return true;
     }
-    return () => clearInterval(interval);
-  }, [userInfo, isLoading, fetchLatestEmail]);
+    return false;
+  };
+
+  const handleAppStateChange = nextAppState => {
+    if (nextAppState === 'background' && isTaskRunning) {
+      console.log('App is in background, background task continues running');
+    }
+  };
 
   const checkAndStartBackgroundTask = async () => {
     try {
       const isTaskStarted = await AsyncStorage.getItem(
         'isBackgroundTaskStarted',
       );
-      if (isTaskStarted !== 'true') {
-        await startTask();
-        await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
-      } else {
+      if (isTaskStarted === 'true') {
         setIsTaskRunning(true);
       }
     } catch (error) {
-      console.error('Error checking/starting background task:', error);
+      console.error('Error checking background task status:', error);
     }
   };
 
@@ -146,20 +138,18 @@ const App = () => {
     if (isSigninInProgress) return;
 
     setIsSigninInProgress(true);
-    console.log('Sign-in in progress...');
     try {
       await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
       const userInfo = await GoogleSignin.signIn();
       setUserInfo(userInfo);
     } catch (error) {
-      console.error('ERROR IS: ' + JSON.stringify(error));
+      console.error('Sign-In Error:', error);
       Alert.alert(
         'Sign-In Error',
         'An error occurred during sign-in. Please try again.',
       );
     } finally {
       setIsSigninInProgress(false);
-      console.log('Sign-in progress reset');
     }
   };
 
@@ -174,7 +164,7 @@ const App = () => {
       setConfidence(null);
     } catch (error) {
       console.error('Sign out error:', error);
-      Alert.alert('An error occurred while signing out');
+      Alert.alert('Error', 'An error occurred while signing out');
     }
   };
 
@@ -202,7 +192,7 @@ const App = () => {
           );
           const messageData = await messageResponse.json();
           setLatestEmail(messageData);
-          sendEmailToApi(messageData);
+          await sendEmailToApi(messageData);
         }
       }
     } catch (error) {
@@ -264,7 +254,6 @@ const App = () => {
         setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
         scammerCacheRef.current[sender] = true;
 
-        // Show notification for scam email only if not previously notified
         if (!notifiedScammersRef.current[sender]) {
           PushNotification.localNotification({
             channelId: 'default-channel-id',
@@ -386,26 +375,12 @@ const App = () => {
 
   const veryIntensiveTask = async taskDataArguments => {
     const {delay} = taskDataArguments;
-    let localTimer = 60;
-
-    while (BackgroundService.isRunning()) {
-      await fetchLatestEmail();
-
-      // Update notification with timer
-      await BackgroundService.updateNotification({
-        taskDesc: `Next email check in ${localTimer}s`,
-      });
-
-      while (localTimer > 0 && BackgroundService.isRunning()) {
-        await sleep(1000);
-        localTimer--;
-        await BackgroundService.updateNotification({
-          taskDesc: `Next email check in ${localTimer}s`,
-        });
+    await new Promise(async resolve => {
+      for (let i = 0; BackgroundService.isRunning(); i++) {
+        await fetchLatestEmail();
+        await sleep(delay);
       }
-
-      localTimer = 60;
-    }
+    });
   };
 
   const options = {
@@ -419,34 +394,34 @@ const App = () => {
     color: '#ff00ff',
     linkingURI: 'yourSchemeHere://chat/jane',
     parameters: {
-      delay: 1000,
+      delay: 60000,
     },
   };
 
   const startTask = async () => {
-    console.log('Starting background task');
-    setIsTaskRunning(true);
-    try {
-      await BackgroundService.start(veryIntensiveTask, options);
-      await BackgroundService.updateNotification({
-        taskDesc: 'Gmail scanner started...',
-      });
-    } catch (error) {
-      console.error('Error starting background task:', error);
+    if (!isTaskRunning) {
+      console.log('Starting background task');
+      setIsTaskRunning(true);
+      try {
+        await BackgroundService.start(veryIntensiveTask, options);
+        await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
+      } catch (error) {
+        console.error('Error starting background task:', error);
+        setIsTaskRunning(false);
+      }
     }
   };
 
   const stopTask = async () => {
-    console.log('Stopping background task');
-    setIsTaskRunning(false);
-    try {
-      await BackgroundService.stop();
-      await BackgroundService.updateNotification({
-        taskDesc: 'Gmail scanner stopped',
-      });
-      await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
-    } catch (error) {
-      console.error('Error stopping background task:', error);
+    if (isTaskRunning) {
+      console.log('Stopping background task');
+      try {
+        await BackgroundService.stop();
+        setIsTaskRunning(false);
+        await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
+      } catch (error) {
+        console.error('Error stopping background task:', error);
+      }
     }
   };
 
@@ -526,20 +501,15 @@ const App = () => {
                   )}
                 </TouchableOpacity>
               </View>
-              {userInfo && (
-                <TouchableOpacity
-                  style={[
-                    styles.startButton,
-                    isTaskRunning && styles.stopButton,
-                  ]}
-                  onPress={isTaskRunning ? stopTask : startTask}>
-                  <Text style={styles.buttonText}>
-                    {isTaskRunning
-                      ? 'Stop Background Task'
-                      : 'Start Background Task'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[styles.startButton, isTaskRunning && styles.stopButton]}
+                onPress={isTaskRunning ? stopTask : startTask}>
+                <Text style={styles.buttonText}>
+                  {isTaskRunning
+                    ? 'Stop Background Task'
+                    : 'Start Background Task'}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
