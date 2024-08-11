@@ -73,7 +73,7 @@ const fetchScamDetails = async phoneNumber => {
   }
 };
 
-const App = () => {
+const Sms = () => {
   const [latestSms, setLatestSms] = useState('');
   const [smsSender, setSmsSender] = useState('');
   const [predictedResult, setPredictedResult] = useState('');
@@ -717,4 +717,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default App;
+export default Sms;

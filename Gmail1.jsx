@@ -41,7 +41,7 @@ PushNotification.configure({
 
 const sleep = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
-const App = () => {
+const Gmail1 = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
@@ -741,4 +741,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default App;
+export default Gmail1;
