@@ -31,6 +31,7 @@ const WEB_CLIENT_ID =
 const ANDROID_CLIENT_ID =
   '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
 
+// Push Notification configuration
 PushNotification.createChannel(
   {
     channelId: 'default-channel-id',
@@ -61,6 +62,18 @@ PushNotification.configure({
 
 const sleep = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
+// Function to format the phone number
+const formatPhoneNumber = phoneNumber => {
+  if (!phoneNumber) return '';
+  const cleaned = phoneNumber.replace(/\D/g, ''); // Remove non-digit characters
+
+  // Ensure at least 10 digits for a valid US number
+  if (cleaned.length < 10) return '';
+
+  // Format it as +1 (650) 555-1212 or +1 650 555-1212
+  return `+1 ${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+};
+
 const App = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
@@ -88,12 +101,89 @@ const App = () => {
   const [processing, setProcessing] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
-  const [scamMessages, setScamMessages] = useState([]);
   const [incomingCallNumber, setIncomingCallNumber] = useState('');
-  const [isIncomingCallScammer, setIsIncomingCallScammer] = useState(false);
   const timerRef = useRef(null);
   const notifiedSmsRef = useRef(new Set());
 
+  // Function to fetch scam call details
+  const fetchCallScamDetails = async phoneNumber => {
+    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+
+    if (!cleanPhoneNumber) {
+      console.error('Invalid phone number provided');
+      return null;
+    }
+
+    try {
+      const {data, error} = await supabase
+        .from('scammers')
+        .select('scam_no, scam_mes')
+        .eq('scam_no', cleanPhoneNumber);
+
+      if (error) {
+        console.error('Error fetching call scam details:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in fetchCallScamDetails:', error);
+      return null;
+    }
+  };
+
+  // Call detection setup
+  useEffect(() => {
+    let callDetector;
+
+    const setupCallDetector = async () => {
+      try {
+        callDetector = new CallDetectorManager(
+          async (event, number) => {
+            if (event === 'Incoming') {
+              console.log('Incoming call from:', number);
+              const scamDetails = await fetchCallScamDetails(number);
+              if (scamDetails && scamDetails.length > 0) {
+                console.log('Scammer detected:', number);
+                Alert.alert(
+                  'Scam Call Detected',
+                  `Number: ${scamDetails[0].scam_no}\nMessage: ${scamDetails[0].scam_mes}`,
+                  [{text: 'OK', onPress: () => console.log('Alert closed')}],
+                  {cancelable: false},
+                );
+              } else {
+                Alert.alert(
+                  'Incoming Call',
+                  `Incoming call from: ${number}`,
+                  [{text: 'OK', onPress: () => console.log('Alert closed')}],
+                  {cancelable: false},
+                );
+              }
+            }
+          },
+          true,
+          () => {
+            console.log('Call Detector is initialized successfully');
+          },
+          err => {
+            console.error('Call Detector failed to initialize', err);
+          },
+        );
+      } catch (error) {
+        console.error('Error setting up Call Detector:', error);
+      }
+    };
+
+    setupCallDetector();
+
+    return () => {
+      if (callDetector) {
+        callDetector.dispose();
+      }
+    };
+  }, []);
+
+  // Other useEffect for Google Sign-in
   useEffect(() => {
     configureGoogleSignin();
     requestReadSmsPermission();
@@ -355,6 +445,14 @@ const App = () => {
   };
 
   const fetchScamEmails = async sender => {
+    if (!sender) {
+      Alert.alert(
+        'Invalid Sender',
+        'No sender specified to fetch scam emails.',
+      );
+      return;
+    }
+
     try {
       const {data, error} = await supabase
         .from('Gmailss')
@@ -554,6 +652,7 @@ const App = () => {
       setIsChecking(false);
     }
   };
+
   useEffect(() => {
     if (!processing && latestSms && !isChecking) {
       sendMessageToApi(latestSms);
@@ -583,19 +682,7 @@ const App = () => {
         console.log('Scam message successfully stored.');
       }
     } catch (error) {
-      console.error('Error storing scam message in Supabase)', error);
-      const messageId = messages[0]._id;
-
-      // Check if this message has already been processed
-      if (messageId !== lastProcessedSmsId) {
-        setLastProcessedSmsId(messageId);
-        setLatestSms(latestMessage);
-        setSmsSender(sender);
-
-        if (!notifiedSmsRef.current.has(messageId)) {
-          sendSmsToApi(latestMessage, sender);
-        }
-      }
+      console.error('Error storing scam message in Supabase:', error);
     }
   };
 

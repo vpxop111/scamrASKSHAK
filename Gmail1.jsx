@@ -18,10 +18,21 @@ import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const WEB_CLIENT_ID =
-  '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
-const ANDROID_CLIENT_ID =
-  '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
+const WEB_CLIENT_ID = 'your-web-client-id';
+const ANDROID_CLIENT_ID = 'your-android-client-id';
+
+// Push Notification configuration
+PushNotification.createChannel(
+  {
+    channelId: 'default-channel-id',
+    channelName: 'Default Channel',
+    channelDescription: 'A default channel',
+    soundName: 'default',
+    importance: 4,
+    vibrate: true,
+  },
+  created => console.log(`createChannel returned '${created}'`),
+);
 
 PushNotification.configure({
   onRegister: function (token) {
@@ -41,14 +52,13 @@ PushNotification.configure({
 
 const sleep = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
-const Gmail1 = () => {
+const App = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
   const [latestEmailId, setLatestEmailId] = useState(null);
   const [emailStatus, setEmailStatus] = useState(null);
   const [confidence, setConfidence] = useState(null);
-  const [timer, setTimer] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
   const [scammerStatus, setScammerStatus] = useState({
     isScammer: false,
@@ -200,7 +210,6 @@ const Gmail1 = () => {
       Alert.alert('Error', 'Failed to fetch the latest email');
     } finally {
       setIsLoading(false);
-      setTimer(60);
     }
   }, [latestEmailId, isLoading, userInfo]);
 
@@ -487,20 +496,17 @@ const Gmail1 = () => {
                   Fetching latest email...
                 </Text>
               )}
-              <View style={styles.timerContainer}>
-                <Text style={styles.timerText}>Next update in: {timer}s</Text>
-                <TouchableOpacity
-                  style={styles.refreshButton}
-                  onPress={fetchLatestEmail}
-                  disabled={isLoading}
-                  activeOpacity={0.7}>
-                  {isLoading ? (
-                    <ActivityIndicator color="#ffffff" />
-                  ) : (
-                    <Text style={styles.buttonText}>Refresh</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={fetchLatestEmail}
+                disabled={isLoading}
+                activeOpacity={0.7}>
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Refresh</Text>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.startButton, isTaskRunning && styles.stopButton]}
                 onPress={isTaskRunning ? stopTask : startTask}>
@@ -658,10 +664,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  timerText: {
-    fontSize: 16,
-    color: '#333',
-  },
   refreshButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 5,
@@ -741,4 +743,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Gmail1;
+export default App;
