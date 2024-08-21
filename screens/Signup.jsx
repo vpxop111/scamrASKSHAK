@@ -1,12 +1,5 @@
 import React, {useState} from 'react';
-import {
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Alert,
-  StyleSheet,
-} from 'react-native';
+import {Text, TextInput, TouchableOpacity, View, Alert} from 'react-native';
 import {supabase} from '../supabase';
 
 export default function Signup({navigation}) {
@@ -37,118 +30,57 @@ export default function Signup({navigation}) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.innerContainer}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.blueText}>Create</Text>
-          <Text style={styles.blackText}>an</Text>
+    <View className="bg-black h-full">
+      <View className="flex flex-col mt-20 bg-blakc">
+        <View className="flex flex-row pl-8 gap-2">
+          <Text className="text-5xl font-bold text-[#ddff00]">Create</Text>
+          <Text className="text-5xl font-bold text-white">an</Text>
         </View>
-        <Text style={styles.blackTextSecond}>account</Text>
-        <View style={styles.inputContainer}>
+        <Text className="text-5xl font-bold text-white ml-8 mt-2">account</Text>
+        <View className="w-[1rem] mr-5 h-20 ml-5 rounded-full border-4 border-[#ddff00] mt-10">
           <TextInput
-            style={styles.input}
+            className="mt-3 mx-5 text-lg text-white"
             placeholder="Email"
             value={registerEmail}
+            placeholderTextColor="#ffffff"
+            style={{color: '#ffffff'}}
             onChangeText={text => setRegisterEmail(text)}
           />
         </View>
-        <View style={styles.inputContainer}>
+        <View className="w-[1rem] mr-5 h-20 ml-5 rounded-full border-4 border-[#ddff00] mt-10">
           <TextInput
-            style={styles.input}
+            className="mt-3 mx-5 text-lg text-white"
             placeholder="Password"
             secureTextEntry
+            placeholderTextColor="#ffffff"
+            style={{color: '#ffffff'}}
             value={registerPassword}
             onChangeText={text => setRegisterPassword(text)}
           />
         </View>
-        <View style={styles.inputContainer}>
+        <View className="w-[1rem] mr-5 h-20 ml-5 rounded-full border-4 border-[#ddff00] mt-10">
           <TextInput
-            style={styles.input}
+            className="mt-3 mx-5 text-lg text-white"
             placeholder="Confirm Password"
             secureTextEntry
+            placeholderTextColor="#ffffff"
+            style={{color: '#ffffff'}}
             value={confirmPassword}
             onChangeText={text => setConfirmPassword(text)}
           />
         </View>
-        <View style={styles.buttonContainer}>
+        <View className="flex flex-row justify-center mt-20">
           <TouchableOpacity
-            style={styles.button}
+            className="p-5 bg-[#ddff00] rounded-full shadow-lg w-60"
             activeOpacity={0.7}
             onPress={register}
             disabled={loading}>
-            <Text style={styles.buttonText}>Signup</Text>
+            <Text className="text-black text-center text-2xl font-bold">
+              Signup
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'white',
-    height: '100%',
-  },
-  innerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    paddingLeft: 8,
-    gap: 10,
-  },
-  blueText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#0029FF',
-  },
-  blackText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: 'black',
-  },
-  blackTextSecond: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: 'black',
-    marginLeft: 8,
-    marginTop: 8,
-  },
-  inputContainer: {
-    width: '100%',
-    height: 60,
-    borderRadius: 50,
-    borderWidth: 1,
-    borderColor: 'black',
-    marginTop: 10,
-    justifyContent: 'center',
-    paddingLeft: 20,
-  },
-  input: {
-    fontSize: 18,
-  },
-  buttonContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 80,
-  },
-  button: {
-    paddingVertical: 16,
-    backgroundColor: '#0029FF',
-    borderRadius: 50,
-    width: 240,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.8,
-    shadowRadius: 2,
-    elevation: 5,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-});

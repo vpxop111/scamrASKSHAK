@@ -1,12 +1,12 @@
 import {View, Text} from 'react-native';
 import React from 'react';
 
-const Scamai = () => {
+const Website = () => {
   return (
     <View>
-      <Text>Scamai</Text>
+      <Text>Website</Text>
     </View>
   );
 };
 
-export default Scamai;
+export default Website;

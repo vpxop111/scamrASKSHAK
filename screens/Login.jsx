@@ -55,7 +55,7 @@ export default function Login({navigation}) {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
@@ -66,42 +66,50 @@ export default function Login({navigation}) {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.innerContainer}>
-        <View style={styles.textContainer}>
-          <Text style={styles.welcomeText}>Welcome</Text>
-          <View style={styles.row}>
-            <Text style={styles.backText}>Back</Text>
-            <Text style={styles.exclamationText}>!</Text>
+    <View className="bg-black h-full">
+      <View className="flex flex-col mt-20 bg-black">
+        <View className="flex flex-col ml-8">
+          <Text className="text-5xl font-bold text-[#ddff00]">Welcome</Text>
+          <View className="flex flex-row mt-2">
+            <Text className="text-5xl font-bold text-white">Back</Text>
+            <Text className="text-5xl font-bold text-[#ddff00]">!</Text>
           </View>
-          <View style={styles.inputContainer}>
+          <View className="w-[1rem] mr-10 h-20 rounded-full border-4 border-[#ddff00] mt-10">
             <TextInput
-              style={styles.input}
+              className="mt-3 mx-5 text-lg text-white"
               placeholder="Email"
+              placeholderTextColor="#ffffff" // Set placeholder text color to white
               value={loginEmail}
               onChangeText={text => setLoginEmail(text)}
+              style={{color: '#ffffff'}} // Set user input text color to white
             />
           </View>
-          <View style={[styles.inputContainer, styles.passwordContainer]}>
+          <View className="w-[1rem] mr-10 h-20 rounded-full border-4 border-[#ddff00] mt-10">
             <TextInput
-              style={styles.input}
+              className="mt-3 mx-5 text-lg text-white"
               placeholder="Password"
+              placeholderTextColor="#ffffff" // Set placeholder text color to white
               secureTextEntry
               value={loginPassword}
               onChangeText={text => setLoginPassword(text)}
+              style={{color: '#ffffff'}} // Set user input text color to white
             />
           </View>
           <Text
-            style={styles.forgotPasswordText}
+            className="text-lg mt-3 ml-40 pl-11 font-bold text-[#ddff00]"
             onPress={() => navigation.navigate('forgot')}>
             Forgot Password?
           </Text>
-          <View style={styles.loginButtonContainer}>
+          <View className="flex flex-row justify-center mt-20 mr-8">
             <TouchableOpacity
-              style={styles.loginButton}
+              className="p-5  rounded-full shadow-lg w-60 bg-[#ddff00]"
               activeOpacity={0.7}
-              onPress={signInWithEmail}>
-              <Text style={styles.loginButtonText}>Login</Text>
+              onPress={() => {
+                navigation.navigate('Home');
+              }}>
+              <Text className="text-black text-center text-2xl font-bold">
+                Login
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -109,88 +117,3 @@ export default function Login({navigation}) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    backgroundColor: 'white',
-    height: '100%',
-  },
-  innerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  textContainer: {
-    marginLeft: 8,
-  },
-  welcomeText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#0029FF',
-  },
-  row: {
-    flexDirection: 'row',
-    marginTop: 2,
-  },
-  backText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: 'black',
-  },
-  exclamationText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#0029FF',
-  },
-  inputContainer: {
-    width: '100%',
-    height: 60,
-    borderRadius: 50,
-    borderWidth: 1,
-    borderColor: 'black',
-    marginTop: 10,
-    justifyContent: 'center',
-  },
-  passwordContainer: {
-    marginTop: 8,
-  },
-  input: {
-    marginHorizontal: 20,
-    fontSize: 18,
-  },
-  forgotPasswordText: {
-    fontSize: 18,
-    color: '#0029FF',
-    marginTop: 12,
-    marginLeft: 'auto',
-    marginRight: 20,
-    fontWeight: 'bold',
-  },
-  loginButtonContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 80,
-  },
-  loginButton: {
-    paddingVertical: 16,
-    backgroundColor: '#0029FF',
-    borderRadius: 50,
-    width: 240,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.8,
-    shadowRadius: 2,
-    elevation: 5,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-});

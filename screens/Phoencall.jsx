@@ -1,12 +1,12 @@
 import {View, Text} from 'react-native';
 import React from 'react';
 
-const Scamai = () => {
+const Phoencall = () => {
   return (
     <View>
-      <Text>Scamai</Text>
+      <Text>Phoencall</Text>
     </View>
   );
 };
 
-export default Scamai;
+export default Phoencall;

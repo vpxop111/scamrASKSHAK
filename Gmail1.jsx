@@ -5,12 +5,12 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
-  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   Modal,
   BackHandler,
   AppState,
+  StatusBar,
 } from 'react-native';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import {supabase} from './supabase';
@@ -18,21 +18,10 @@ import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const WEB_CLIENT_ID = 'your-web-client-id';
-const ANDROID_CLIENT_ID = 'your-android-client-id';
-
-// Push Notification configuration
-PushNotification.createChannel(
-  {
-    channelId: 'default-channel-id',
-    channelName: 'Default Channel',
-    channelDescription: 'A default channel',
-    soundName: 'default',
-    importance: 4,
-    vibrate: true,
-  },
-  created => console.log(`createChannel returned '${created}'`),
-);
+const WEB_CLIENT_ID =
+  '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
+const ANDROID_CLIENT_ID =
+  '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
 
 PushNotification.configure({
   onRegister: function (token) {
@@ -52,13 +41,14 @@ PushNotification.configure({
 
 const sleep = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
-const App = () => {
+const Gmail1 = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
   const [latestEmailId, setLatestEmailId] = useState(null);
   const [emailStatus, setEmailStatus] = useState(null);
   const [confidence, setConfidence] = useState(null);
+  const [timer, setTimer] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
   const [scammerStatus, setScammerStatus] = useState({
     isScammer: false,
@@ -79,6 +69,8 @@ const App = () => {
       'hardwareBackPress',
       onBackPress,
     );
+
+    // Use AppState instead of Gmail1State
     const appStateSubscription = AppState.addEventListener(
       'change',
       handleAppStateChange,
@@ -113,7 +105,7 @@ const App = () => {
 
   const handleAppStateChange = nextAppState => {
     if (nextAppState === 'background' && isTaskRunning) {
-      console.log('App is in background, background task continues running');
+      console.log('Gmail1 is in background, background task continues running');
     }
   };
 
@@ -210,6 +202,7 @@ const App = () => {
       Alert.alert('Error', 'Failed to fetch the latest email');
     } finally {
       setIsLoading(false);
+      setTimer(60);
     }
   }, [latestEmailId, isLoading, userInfo]);
 
@@ -436,6 +429,7 @@ const App = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.scrollView}>
         <View style={styles.container}>
           {!userInfo ? (
@@ -496,17 +490,6 @@ const App = () => {
                   Fetching latest email...
                 </Text>
               )}
-              <TouchableOpacity
-                style={styles.refreshButton}
-                onPress={fetchLatestEmail}
-                disabled={isLoading}
-                activeOpacity={0.7}>
-                {isLoading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.buttonText}>Refresh</Text>
-                )}
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.startButton, isTaskRunning && styles.stopButton]}
                 onPress={isTaskRunning ? stopTask : startTask}>
@@ -650,33 +633,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 15,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  refreshButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
-    padding: 10,
-  },
-  checkScamButton: {
-    backgroundColor: '#FF9800',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginTop: 10,
-    alignItems: 'center',
-  },
   startButton: {
     backgroundColor: '#2196F3',
     paddingVertical: 12,
@@ -743,4 +699,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default App;
+export default Gmail1;

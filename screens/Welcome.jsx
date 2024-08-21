@@ -1,9 +1,16 @@
 import React, {useState, useEffect} from 'react';
-import {View, Alert, TouchableOpacity, Text, StyleSheet} from 'react-native';
+import {
+  View,
+  Alert,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Image,
+} from 'react-native';
 import {supabase} from '../supabase';
 import Gmail1 from '../Gmail1';
 
-export default function App({navigation}) {
+export default function Welcome({navigation}) {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,27 +59,37 @@ export default function App({navigation}) {
   ) : session && session.user ? (
     <></> // Your logged-in UI goes here
   ) : (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>ScamSafe</Text>
-      </View>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.loginButton}
-          activeOpacity={0.7}
-          onPress={() => {
-            navigation.navigate('Login');
-          }}>
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.signupButton}
-          activeOpacity={0.7}
-          onPress={() => {
-            navigation.navigate('Signup');
-          }}>
-          <Text style={styles.signupButtonText}>Signup</Text>
-        </TouchableOpacity>
+    <View className="flex">
+      <View className="flex flex-col h-full bg-black">
+        <View className="flex flex-row justify-center pt-60 mt-20">
+          <View className="flex flex-row items-center">
+            <Text className="text-5xl font-semibold text-[#ddff00]">S</Text>
+            <Text className="text-3xl font-semibold text-white">cam</Text>
+            <Text className="text-3xl font-semibold text-white">Rakshak</Text>
+          </View>
+        </View>
+        <View className="flex flex-row gap-12 justify-center mt-60">
+          <TouchableOpacity
+            className="p-5 bg-black border-4 border-[#ddff00] rounded-xl shadow-lg"
+            activeOpacity={0.7}
+            onPress={() => {
+              navigation.navigate('Login');
+            }}>
+            <Text className="text-white text-center text-2xl font-bold">
+              Login
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="p-5 bg-[#0029FF] rounded-xl shadow-lg"
+            activeOpacity={0.7}
+            onPress={() => {
+              navigation.navigate('Signup');
+            }}>
+            <Text className="text-white text-center text-2xl font-bold">
+              Signup
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );

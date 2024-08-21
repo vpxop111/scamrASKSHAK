@@ -12,13 +12,9 @@ import {
   BackHandler,
   AppState,
   StatusBar,
-  PermissionsAndroid,
   Dimensions,
 } from 'react-native';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
-import SmsAndroid from 'react-native-get-sms-android';
-import CallDetectorManager from 'react-native-call-detection';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +23,60 @@ import {supabase} from './supabase';
 const {width} = Dimensions.get('window');
 
 const WEB_CLIENT_ID =
+  '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
+const ANDROID_CLIENT_ID =
+  '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
+
+// Push Notification configuration
+PushNotification.createChannel(
+  {
+    channelId: 'default-channel-id',
+    channelName: 'Default Channel',
+    channelDescription: 'A default channel',
+    soundName: 'default',
+    importance: 4,
+    vibrate: true,
+  },
+  created => console.log(`createChannel returned '${created}'`),
+);
+
+PushNotification.configure({
+  onRegister: function (token) {
+    console.log('TOKEN:', token);
+  },
+  onNotification: function (notification) {
+    console.log('NOTIFICATION:', notification);
+  },
+  permissions: {
+    alert: true,
+    badge: true,
+    sound: true,
+  },
+  popInitialNotification: true,
+  requestPermissions: true,
+});
+
+const App = () => {
+  const [userInfo, setUserInfo] = useState(null);
+  const [isSigninInProgress, setIsSigninInProgress] = useState(false);
+  const [latestEmail, setLatestEmail] = useState(null);
+  const [latestEmailId, setLatestEmailId] = useState(null);
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [confidence, setConfidence] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [scammerStatus, setScammerStatus] = useState({
+    isScammer: false,
+    checkedSender: null,
+    stored: false,
+  });
+  const [scamEmails, setScamEmails] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [isTaskRunning, setIsTaskRunning] = useState(false);
+  const scammerCacheRef = useRef({});
+  const notifiedScammersRef = useRef({});
+
+  // Call detection setup
+  const WEB_CLIENT_ID =
   '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
 const ANDROID_CLIENT_ID =
   '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
@@ -545,218 +595,6 @@ const App = () => {
     }
   };
 
-  const requestReadSmsPermission = async () => {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_SMS,
-        {
-          title: 'Read SMS Permission',
-          message: 'This app needs access to your SMS messages to read them.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        },
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        readLatestSMS();
-      }
-    } catch (err) {
-      console.warn(err);
-    }
-  };
-
-  const readLatestSMS = () => {
-    SmsAndroid.list(
-      JSON.stringify({
-        box: 'inbox',
-        indexFrom: 0,
-        maxCount: 1,
-      }),
-      fail => {
-        console.log('Failed with this error: ' + fail);
-      },
-      (count, smsList) => {
-        const messages = JSON.parse(smsList);
-        if (messages.length > 0) {
-          const latestMessage = messages[0].body;
-          const sender = messages[0].address;
-          const messageId = messages[0]._id;
-
-          // Check if the message has already been processed
-          if (messageId !== lastProcessedSmsId) {
-            setLastProcessedSmsId(messageId);
-            setLatestSms(latestMessage);
-            setSmsSender(sender);
-            sendSmsToApi(sender, latestMessage);
-          }
-        }
-      },
-    );
-  };
-
-  const sendMessageToApi = async message => {
-    if (!message) {
-      setIsChecking(false);
-      return;
-    }
-
-    setProcessing(true);
-    setApiStatus('Sending message to API...');
-    try {
-      const response = await fetch(
-        'https://varun324242-sssssss.hf.space/predict',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({message}),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const data = await response.json();
-      const result = data.predicted_result || 'No result found';
-      setPredictedResult(result);
-      setApiStatus('API response received');
-
-      if (result.toLowerCase() === 'scam') {
-        const cleanSender = smsSender.replace(/ $Scammer$$/, '');
-        await storeScamMessage(cleanSender, message);
-        setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
-        scammerCacheRef.current[cleanSender] = true;
-
-        // Check if we've already notified about this SMS
-        if (!notifiedSmsRef.current.has(lastProcessedSmsId)) {
-          // Show notification for scam message
-          PushNotification.localNotification({
-            channelId: 'default-channel-id',
-            title: 'Scam SMS Detected',
-            message: `From: ${cleanSender}\nMessage: ${message}`,
-          });
-
-          // Add this SMS to the notified set
-          notifiedSmsRef.current.add(lastProcessedSmsId);
-          await saveNotifiedSms();
-        }
-      }
-    } catch (error) {
-      console.error('Error sending message to API: ', error);
-      setPredictedResult('Error sending message to API');
-      setApiStatus('Error sending message to API');
-    } finally {
-      setProcessing(false);
-      setIsChecking(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!processing && latestSms && !isChecking) {
-      sendMessageToApi(latestSms);
-    }
-  }, [processing, latestSms, isChecking]);
-
-  const storeScamMessage = async (phoneNumber, message) => {
-    try {
-      if (typeof phoneNumber !== 'string') {
-        console.error('Invalid phone number type');
-        return;
-      }
-
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-
-      const {data, error} = await supabase
-        .from('scammers')
-        .insert([{scam_no: cleanPhoneNumber, scam_mes: message}]);
-
-      if (error) {
-        if (error.code === '23505') {
-          console.log('Scammer already exists in the database.');
-        } else {
-          throw error;
-        }
-      } else {
-        console.log('Scam message successfully stored.');
-      }
-    } catch (error) {
-      console.error('Error storing scam message in Supabase:', error);
-    }
-  };
-
-  const sendSmsToApi = async (message, sender) => {
-    setProcessing(true);
-    try {
-      const response = await fetch('https://varun324242-sms.hf.space/predict', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message, sender}),
-      });
-      const result = await response.json();
-      console.log('API Response:', result);
-      setPredictedResult(result.predicted_result);
-      setApiStatus('Success');
-
-      if (result.predicted_result.toLowerCase() === 'scam') {
-        await storeScamSms(sender, message);
-        notifiedSmsRef.current.add(lastProcessedSmsId);
-        PushNotification.localNotification({
-          channelId: 'default-channel-id',
-          title: 'Scam SMS Detected',
-          message: `Scam SMS from ${sender}`,
-          bigText: `Message: ${message}`,
-        });
-      }
-    } catch (error) {
-      console.error('Error sending SMS to API:', error);
-      setApiStatus('Error');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const storeScamSms = async (sender, message) => {
-    try {
-      const {data, error} = await supabase
-        .from('SMSMessages')
-        .insert([{scam_sms: sender, scam_message: message}]);
-
-      if (error) {
-        if (error.code === '23505') {
-          console.log('Scammer SMS already exists in the database.');
-        } else {
-          throw error;
-        }
-      } else {
-        console.log('Scam SMS successfully stored.');
-      }
-    } catch (error) {
-      console.error('Error storing scam SMS in Supabase:', error);
-    }
-  };
-
-  const checkAndStartBackgroundTask = async () => {
-    const isBackgroundTaskStarted = await AsyncStorage.getItem(
-      'isBackgroundTaskStarted',
-    );
-
-    if (isBackgroundTaskStarted === 'true') {
-      startTask();
-    }
-  };
-
-  const renderScamEmails = () => {
-    return scamEmails.map((email, index) => (
-      <View key={index} style={styles.scamEmailContainer}>
-        <Text style={styles.scamEmailSender}>{email.scam_email}</Text>
-        <Text style={styles.scamEmailSubject}>{email.scam_subject}</Text>
-        <Text style={styles.scamEmailBody}>{email.scam_body}</Text>
-      </View>
-    ));
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -768,7 +606,6 @@ const App = () => {
             style={styles.signInButton}
             onPress={signIn}
             disabled={isSigninInProgress}>
-            <Icon name="google" size={24} color="#fff" />
             <Text style={styles.signInButtonText}>Sign In with Google</Text>
           </TouchableOpacity>
         ) : (
@@ -806,10 +643,6 @@ const App = () => {
                 </Text>
               )}
             </View>
-
-            <View style={styles.timerContainer}>
-              <Text style={styles.timerText}>Next fetch in: {timer}s</Text>
-            </View>
           </View>
         )}
 
@@ -828,15 +661,6 @@ const App = () => {
                 : 'Check Scammer Status'}
             </Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.smsContainer}>
-          <Text style={styles.smsText}>Latest SMS: {latestSms}</Text>
-          <Text style={styles.smsSender}>From: {smsSender}</Text>
-          <Text style={styles.predictedResult}>
-            Prediction: {predictedResult || 'Unknown'}
-          </Text>
-          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
         </View>
 
         <Modal
@@ -954,12 +778,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontStyle: 'italic',
   },
-  timerContainer: {
-    marginTop: 10,
-  },
-  timerText: {
-    fontStyle: 'italic',
-  },
   scamContainer: {
     marginBottom: 20,
     alignItems: 'center',
@@ -976,26 +794,6 @@ const styles = StyleSheet.create({
   scamButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  smsContainer: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  smsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  smsSender: {
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  predictedResult: {
-    marginTop: 5,
-    fontWeight: 'bold',
-  },
-  apiStatus: {
-    marginTop: 5,
-    fontStyle: 'italic',
   },
   modalContainer: {
     flex: 1,
