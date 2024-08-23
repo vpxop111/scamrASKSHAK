@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,13 @@ import {
 import SmsAndroid from 'react-native-get-sms-android';
 import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {supabase} from './supabase';
+import {supabase} from './supabase'; // Import your Supabase client instance
 import {useTask} from './TaskContext'; // Import useTask from TaskContext
+import {AuthContext} from './AuthContext';
+import Smsnotifi from './Smsnotifi';
 
 const Sms = () => {
+  const {user, signOut} = useContext(AuthContext); // Use AuthContext to get user and signOut
   const {taskStarted, startTask, stopTask} = useTask(); // Use TaskContext
   const [latestSms, setLatestSms] = useState('');
   const [smsSender, setSmsSender] = useState('');
@@ -31,6 +33,15 @@ const Sms = () => {
   const [isTaskRunning, setIsTaskRunning] = useState(taskStarted); // Sync with context
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
   const [countdown, setCountdown] = useState(20); // Initial countdown value (in seconds)
+
+  useEffect(() => {
+    if (user) {
+      console.log('User email:', user.email);
+      console.log('User UID:', user.uid);
+    } else {
+      navigation.navigate('Login'); // Redirect to Login if no user
+    }
+  }, [user]);
 
   useEffect(() => {
     requestReadSmsPermission();
@@ -138,6 +149,66 @@ const Sms = () => {
     );
   };
 
+  const storeScamMessageInScamsms = async (phoneNumber, message) => {
+    try {
+      if (typeof phoneNumber !== 'string') {
+        console.error('Invalid phone number type');
+        return;
+      }
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+
+      const {data, error} = await supabase.from('scamsms').insert([
+        {scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email}, // Use user.email directly
+      ]);
+
+      if (error) {
+        if (error.code === '23505') {
+          console.log('Scam message already exists in the database.');
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('Scam message successfully stored in scamsms.');
+      }
+    } catch (error) {
+      console.error('Error storing scam message in scamsms: ', error);
+    }
+  };
+
+  const storeScamMessage = async (phoneNumber, message) => {
+    try {
+      if (!user || !user.email) {
+        console.error('User email not found');
+        return;
+      }
+
+      if (typeof phoneNumber !== 'string') {
+        console.error('Invalid phone number type');
+        return;
+      }
+
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+
+      const {data, error} = await supabase
+        .from('scamsms') // Change this to the correct table name if needed
+        .insert([
+          {scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email}, // Use user.email directly
+        ]);
+
+      if (error) {
+        if (error.code === '23505') {
+          console.log('Scam message already exists in the database.');
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('Scam message successfully stored in scammers.');
+      }
+    } catch (error) {
+      console.error('Error storing scam message in scammers: ', error);
+    }
+  };
+
   const sendMessageToApi = async ({message, sender}) => {
     setProcessing(true);
     try {
@@ -161,7 +232,8 @@ const Sms = () => {
       setApiStatus('Success');
 
       if (result.predicted_result.toLowerCase() === 'scam') {
-        await storeScamSms(sender, message);
+        await storeScamMessage(sender, message); // Store in scammers table
+        await storeScamMessageInScamsms(sender, message); // Store in scamsms table
 
         // Show notification for detected scam SMS
         PushNotification.localNotification({
@@ -177,22 +249,6 @@ const Sms = () => {
       setApiStatus('Error sending message to API');
     } finally {
       setProcessing(false);
-    }
-  };
-
-  const storeScamSms = async (sender, message) => {
-    try {
-      const {data, error} = await supabase
-        .from('SMSMessages')
-        .insert([{scam_sms: sender, scam_message: message}]);
-
-      if (error) {
-        console.error('Error storing scam SMS in Supabase:', error);
-      } else {
-        console.log('Scam SMS successfully stored.');
-      }
-    } catch (error) {
-      console.error('Error storing scam SMS:', error);
     }
   };
 
@@ -226,84 +282,79 @@ const Sms = () => {
     if (!isTaskRunning) {
       console.log('Starting background task');
       setIsTaskRunning(true);
-      startTask(); // Update context
-      try {
-        await BackgroundService.start(veryIntensiveTask, options);
-        await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
-      } catch (error) {
-        console.error('Error starting background task:', error);
-        setIsTaskRunning(false);
-      }
+      await startTask(options, veryIntensiveTask);
+    } else {
+      console.log('Background task is already running');
     }
   };
 
   const stopTaskHandler = async () => {
     if (isTaskRunning) {
       console.log('Stopping background task');
-      try {
-        await BackgroundService.stop();
-        stopTask(); // Update context
-        setIsTaskRunning(false);
-        setCountdown(20); // Reset countdown when the task stops
-        await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
-      } catch (error) {
-        console.error('Error stopping background task:', error);
-      }
+      setIsTaskRunning(false);
+      await stopTask();
+    } else {
+      console.log('No background task running');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // Handle any additional logout logic if needed
+    } catch (error) {
+      console.error('Error during logout: ', error);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        <View style={styles.header}>
-          <Text style={styles.headerText}>SMS Scanner</Text>
-        </View>
-        <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.inner}>
+          <Text style={styles.header}>SMS Scanner</Text>
+          <Text style={styles.smsContent}>{latestSms}</Text>
+          <Text style={styles.sender}>From: {smsSender}</Text>
+          <Text style={styles.prediction}>Prediction: {predictedResult}</Text>
+          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
+
           <TouchableOpacity
             style={styles.button}
-            onPress={isTaskRunning ? stopTaskHandler : startTaskHandler}>
-            <Text style={styles.buttonText}>
-              {isTaskRunning ? 'Stop Task' : 'Start Task'}
-            </Text>
+            onPress={startTaskHandler}
+            disabled={isTaskRunning || processing}>
+            <Text style={styles.buttonText}>Start Task</Text>
           </TouchableOpacity>
-          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
-          <Text style={styles.predictedResult}>
-            Predicted Result: {predictedResult}
-          </Text>
-          <Text style={styles.latestSms}>Latest SMS: {latestSms}</Text>
-          <Text style={styles.smsSender}>Sender: {smsSender}</Text>
-          <Text style={styles.countdown}>
-            {isTaskRunning ? `Countdown: ${countdown}s` : ''}
-          </Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={stopTaskHandler}
+            disabled={!isTaskRunning || processing}>
+            <Text style={styles.buttonText}>Stop Task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={handleLogout}>
+            <Text style={styles.buttonText}>Logout</Text>
+          </TouchableOpacity>
         </View>
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => {
-            setModalVisible(false);
-          }}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalText}>Are you sure you want to exit?</Text>
+      </ScrollView>
+      <Modal
+        transparent={true}
+        animationType="slide"
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalText}>Background Task Status</Text>
+            <Text style={styles.modalText}>
+              {isTaskRunning ? 'Running' : 'Stopped'}
+            </Text>
             <TouchableOpacity
-              style={styles.button}
-              onPress={() => {
-                setModalVisible(false);
-                BackHandler.exitApp();
-              }}>
-              <Text style={styles.buttonText}>Yes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => {
-                setModalVisible(false);
-              }}>
-              <Text style={styles.buttonText}>No</Text>
+              style={styles.modalButton}
+              onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
-        </Modal>
-      </ScrollView>
+        </View>
+      </Modal>
+      <Smsnotifi />
     </SafeAreaView>
   );
 };
@@ -311,69 +362,80 @@ const Sms = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
   },
-  scrollViewContent: {
+  scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
+  },
+  inner: {
     padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   header: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerText: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 16,
   },
-  content: {
-    alignItems: 'center',
-  },
-  button: {
-    backgroundColor: '#007bff',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: '#ffffff',
+  smsContent: {
     fontSize: 16,
+    marginBottom: 8,
+  },
+  sender: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  prediction: {
+    fontSize: 16,
+    marginBottom: 8,
   },
   apiStatus: {
     fontSize: 16,
-    marginBottom: 10,
+    marginBottom: 16,
   },
-  predictedResult: {
+  button: {
+    backgroundColor: '#007bff',
+    padding: 12,
+    borderRadius: 4,
+    marginVertical: 8,
+  },
+  buttonText: {
+    color: '#fff',
     fontSize: 16,
-    marginBottom: 10,
+    textAlign: 'center',
   },
-  latestSms: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  smsSender: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  countdown: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  modalView: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 35,
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 8,
+    width: '80%',
+    alignItems: 'center',
   },
   modalText: {
-    marginBottom: 15,
-    textAlign: 'center',
+    fontSize: 18,
+    marginBottom: 16,
+  },
+  modalButton: {
+    backgroundColor: '#007bff',
+    padding: 12,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
   },
 });
 

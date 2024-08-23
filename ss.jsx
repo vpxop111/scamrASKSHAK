@@ -1,154 +1,92 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
-  StyleSheet,
-  Text,
   View,
-  PermissionsAndroid,
-  ScrollView,
+  Text,
   TouchableOpacity,
-  Modal,
-  SafeAreaView,
-  StatusBar,
-  Dimensions,
   Alert,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  Modal,
+  BackHandler,
+  AppState,
+  StatusBar,
+  PermissionsAndroid,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
-import {supabase} from './supabase';
-import CallDetectorManager from 'react-native-call-detection';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import BackgroundService from 'react-native-background-actions';
+import PushNotification from 'react-native-push-notification';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {supabase} from './supabase'; // Import your Supabase client instance
+import {useTask} from './TaskContext'; // Import useTask from TaskContext
 
-const {width} = Dimensions.get('window');
-
-const fetchScamDetails = async phoneNumber => {
-  try {
-    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-    const {data, error} = await supabase
-      .from('scammers')
-      .select('scam_no, scam_mes')
-      .eq('scam_no', cleanPhoneNumber)
-      .single();
-
-    if (error) {
-      console.error('Error fetching scam details:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in fetchScamDetails:', error);
-    return null;
-  }
-};
-
-const App = () => {
+const Sms = () => {
+  const {taskStarted, startTask, stopTask} = useTask(); // Use TaskContext
   const [latestSms, setLatestSms] = useState('');
   const [smsSender, setSmsSender] = useState('');
   const [predictedResult, setPredictedResult] = useState('');
-  const [timer, setTimer] = useState(20);
   const [apiStatus, setApiStatus] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
-  const [scammerStatus, setScammerStatus] = useState({
-    isScammer: false,
-    checkedSender: null,
-    stored: false,
-  });
-  const [scamMessages, setScamMessages] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [incomingCallNumber, setIncomingCallNumber] = useState('');
-  const [isIncomingCallScammer, setIsIncomingCallScammer] = useState(false);
-  const timerRef = useRef(null);
-  const scammerCacheRef = useRef({});
+  const [isTaskRunning, setIsTaskRunning] = useState(taskStarted); // Sync with context
+  const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
+  const [countdown, setCountdown] = useState(20); // Initial countdown value (in seconds)
 
   useEffect(() => {
-    const initializeApp = async () => {
-      await requestReadSmsPermission();
-      startTimer();
-    };
+    requestReadSmsPermission();
 
-    initializeApp();
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onBackPress,
+    );
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange,
+    );
+
+    let timer;
+    if (isTaskRunning && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown(prevCount => prevCount - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      readLatestSMS(); // Fetch the latest SMS on countdown reaching zero
+      setCountdown(20); // Reset the countdown for the next cycle
+    }
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      backHandler.remove();
+      appStateSubscription.remove();
+      clearInterval(timer); // Clear the interval on component unmount
     };
-  }, []);
+  }, [isTaskRunning, countdown]);
 
-  useEffect(() => {
-    const updateSenderDisplay = async () => {
-      if (smsSender) {
-        const isScam = await checkIfScammer(smsSender);
-        setSmsSender(prevSender =>
-          isScam
-            ? `${prevSender.replace(/ \(Scammer\)$/, '')} (Scammer)`
-            : prevSender.replace(/ \(Scammer\)$/, ''),
-        );
-        setScammerStatus(prev => ({
-          ...prev,
-          isScammer: isScam,
-          checkedSender: smsSender,
-        }));
-      }
-    };
-
-    updateSenderDisplay();
-  }, [smsSender]);
-
-  useEffect(() => {
-    let callDetector;
-
-    const setupCallDetector = async () => {
-      try {
-        callDetector = new CallDetectorManager(
-          async (event, number) => {
-            if (event === 'Incoming') {
-              console.log('Incoming call from:', number);
-              const scamDetails = await fetchScamDetails(number);
-              if (scamDetails) {
-                console.log('Scammer detected:', number);
-                setIncomingCallNumber(number);
-                setIsIncomingCallScammer(true);
-                Alert.alert(
-                  'Scam Call Detected',
-                  `Number: ${scamDetails.scam_no}\nMessage: ${scamDetails.scam_mes}`,
-                  [{text: 'OK', onPress: () => console.log('Alert closed')}],
-                  {cancelable: false},
-                );
-              } else {
-                setIncomingCallNumber(number);
-                setIsIncomingCallScammer(false);
-                Alert.alert(
-                  'Incoming Call',
-                  `Incoming call from: ${number}`,
-                  [{text: 'OK', onPress: () => console.log('Alert closed')}],
-                  {cancelable: false},
-                );
-              }
-            }
+  const onBackPress = () => {
+    if (isTaskRunning) {
+      Alert.alert(
+        'Background Task Running',
+        'The background task is still running. Do you want to stop it and exit?',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Stop and Exit',
+            onPress: async () => {
+              await stopTask();
+              BackHandler.exitApp();
+            },
           },
-          true,
-          () => {
-            console.log('Call Detector is initialized successfully');
-          },
-          err => {
-            console.error('Call Detector failed to initialize', err);
-          },
-        );
-      } catch (error) {
-        console.error('Error setting up Call Detector:', error);
-      }
-    };
+        ],
+      );
+      return true;
+    }
+    return false;
+  };
 
-    setupCallDetector();
-
-    return () => {
-      if (callDetector) {
-        callDetector.dispose();
-      }
-    };
-  }, []);
+  const handleAppStateChange = nextAppState => {
+    if (nextAppState === 'background' && isTaskRunning) {
+      console.log('App is in background, background task continues running');
+    }
+  };
 
   const requestReadSmsPermission = async () => {
     try {
@@ -163,7 +101,9 @@ const App = () => {
         },
       );
       if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        readLatestSMS();
+        console.log('SMS permission granted');
+      } else {
+        console.log('SMS permission denied');
       }
     } catch (err) {
       console.warn(err);
@@ -186,100 +126,50 @@ const App = () => {
           const latestMessage = messages[0].body;
           const sender = messages[0].address;
           const messageId = messages[0]._id;
+
           if (messageId !== lastProcessedSmsId) {
+            setLastProcessedSmsId(messageId);
             setLatestSms(latestMessage);
             setSmsSender(sender);
-            setLastProcessedSmsId(messageId);
+            sendMessageToApi({message: latestMessage, sender});
           }
         }
       },
     );
   };
 
-  const checkIfScammer = async sender => {
-    console.log('Checking if sender is a scammer:', sender);
-
-    const cleanSender = sender.replace(/ \(Scammer\)$/, '');
-
-    if (cleanSender in scammerCacheRef.current) {
-      return scammerCacheRef.current[cleanSender];
-    }
-
-    try {
-      const scamDetails = await fetchScamDetails(cleanSender);
-      const isScammer = !!scamDetails;
-      scammerCacheRef.current[cleanSender] = isScammer;
-
-      console.log(
-        isScammer
-          ? `Scammer detected: ${cleanSender}`
-          : `Sender is not a scammer: ${cleanSender}`,
-      );
-
-      return isScammer;
-    } catch (error) {
-      console.error('Error in checkIfScammer:', error);
-      return false;
-    }
-  };
-
-  const startTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    setTimer(20);
-    timerRef.current = setInterval(() => {
-      setTimer(prevTimer => {
-        if (prevTimer === 1) {
-          checkForNewMessage();
-          return 20;
-        }
-        return prevTimer - 1;
-      });
-    }, 1000);
-  };
-
-  const checkForNewMessage = () => {
-    if (!processing && !isChecking) {
-      setIsChecking(true);
-      readLatestSMS();
-    }
-  };
-
-  const sendMessageToApi = async message => {
-    if (!message) {
-      setIsChecking(false);
-      return;
-    }
-
+  const sendMessageToApi = async ({message, sender}) => {
     setProcessing(true);
-    setApiStatus('Sending message to API...');
     try {
       const response = await fetch(
-        'https://varun324242-sssssss.hf.space/predict',
+        'https://varun324242-sssssss.hf.space/predict', // Ensure this API endpoint is correct
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({message}),
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message, sender}),
         },
       );
 
       if (!response.ok) {
+        console.error('Network error:', await response.text());
         throw new Error('Network response was not ok');
       }
 
-      const data = await response.json();
-      const result = data.predicted_result || 'No result found';
-      setPredictedResult(result);
-      setApiStatus('API response received');
+      const result = await response.json();
+      console.log('API Response:', result);
+      setPredictedResult(result.predicted_result);
+      setApiStatus('Success');
 
-      if (result.toLowerCase() === 'scam') {
-        const cleanSender = smsSender.replace(/ \(Scammer\)$/, '');
-        await storeScamMessage(cleanSender, message);
-        setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
-        scammerCacheRef.current[cleanSender] = true;
+      if (result.predicted_result.toLowerCase() === 'scam') {
+        await storeScamMessage(sender, message);
+
+        // Show notification for detected scam SMS
+        PushNotification.localNotification({
+          channelId: 'default-channel-id',
+          title: 'Scam SMS Detected',
+          message: `Scam SMS from ${sender}`,
+          bigText: `Message: ${message}`,
+        });
       }
     } catch (error) {
       console.error('Error sending message to API: ', error);
@@ -287,7 +177,6 @@ const App = () => {
       setApiStatus('Error sending message to API');
     } finally {
       setProcessing(false);
-      setIsChecking(false);
     }
   };
 
@@ -318,134 +207,111 @@ const App = () => {
     }
   };
 
-  const fetchScamMessages = async phoneNumber => {
-    try {
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-      const {data, error} = await supabase
-        .from('scammers')
-        .select('scam_no, scam_mes')
-        .eq('scam_no', cleanPhoneNumber);
-
-      if (error) {
-        throw error;
+  const veryIntensiveTask = async taskDataArguments => {
+    const {delay} = taskDataArguments;
+    await new Promise(async resolve => {
+      for (let i = 0; BackgroundService.isRunning(); i++) {
+        await readLatestSMS(); // Fetch the latest SMS
+        await sleep(delay); // Delay for next iteration
       }
+    });
+  };
 
-      if (data && data.length > 0) {
-        setScamMessages(data);
-        setModalVisible(true);
-      } else {
-        console.log('No scam messages found for this number');
-        Alert.alert(
-          'No Scam Messages',
-          'No scam messages found for this number.',
-        );
+  const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+
+  const options = {
+    taskName: 'SMS Scanner',
+    taskTitle: 'SMS Scanner',
+    taskDesc: 'Scanning for spam SMS...',
+    taskIcon: {
+      name: 'ic_launcher',
+      type: 'mipmap',
+    },
+    color: '#ff00ff',
+    parameters: {
+      delay: 20000, // Check every 20 seconds
+    },
+  };
+
+  const startTaskHandler = async () => {
+    if (!isTaskRunning) {
+      console.log('Starting background task');
+      setIsTaskRunning(true);
+      startTask(); // Update context
+      try {
+        await BackgroundService.start(veryIntensiveTask, options);
+        await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
+      } catch (error) {
+        console.error('Error starting background task:', error);
+        setIsTaskRunning(false);
       }
-    } catch (error) {
-      console.error('Error fetching scam messages:', error);
-      Alert.alert('Error', 'Failed to fetch scam messages. Please try again.');
     }
   };
 
-  useEffect(() => {
-    if (!processing && latestSms && !isChecking) {
-      sendMessageToApi(latestSms);
+  const stopTaskHandler = async () => {
+    if (isTaskRunning) {
+      console.log('Stopping background task');
+      try {
+        await BackgroundService.stop();
+        stopTask(); // Update context
+        setIsTaskRunning(false);
+        setCountdown(20); // Reset countdown when the task stops
+        await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
+      } catch (error) {
+        console.error('Error stopping background task:', error);
+      }
     }
-  }, [processing, latestSms, isChecking]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1e272e" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <View style={styles.header}>
-          <Icon name="shield-check" size={30} color="#ffffff" />
-          <Text style={styles.title}>SMS Guard</Text>
+          <Text style={styles.headerText}>SMS Scanner</Text>
+        </View>
+        <View style={styles.content}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={isTaskRunning ? stopTaskHandler : startTaskHandler}>
+            <Text style={styles.buttonText}>
+              {isTaskRunning ? 'Stop Task' : 'Start Task'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
+
+          <Text style={styles.latestSms}>Latest SMS: {latestSms}</Text>
+          <Text style={styles.predictedResult}>
+            Predicted Result: {predictedResult}
+          </Text>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={() => setModalVisible(true)}>
+            <Text style={styles.buttonText}>Show Task Details</Text>
+          </TouchableOpacity>
         </View>
 
-        {incomingCallNumber ? (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Icon name="phone" size={24} color="#2c3e50" />
-              <Text style={styles.cardTitle}>Incoming Call</Text>
-            </View>
-            <Text style={styles.smsSender}>
-              From: {incomingCallNumber} {isIncomingCallScammer && '(Scammer)'}
-            </Text>
-          </View>
-        ) : null}
-
-        {latestSms ? (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Icon name="message-text" size={24} color="#2c3e50" />
-              <Text style={styles.cardTitle}>Latest SMS</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() =>
-                scammerStatus.isScammer && fetchScamMessages(smsSender)
-              }>
-              <Text
-                style={[
-                  styles.smsSender,
-                  scammerStatus.isScammer && styles.scammer,
-                ]}>
-                From: {smsSender}
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Background Task Details</Text>
+              <Text style={styles.modalText}>
+                Task is {isTaskRunning ? 'running' : 'stopped'}
               </Text>
-            </TouchableOpacity>
-            <Text style={styles.smsBody}>{latestSms}</Text>
-          </View>
-        ) : null}
-
-        {predictedResult ? (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Icon name="chart-bubble" size={24} color="#2c3e50" />
-              <Text style={styles.cardTitle}>AI Prediction</Text>
-            </View>
-            <Text
-              style={[
-                styles.predictionResult,
-                predictedResult.toLowerCase() === 'scam' && styles.scamResult,
-              ]}>
-              {predictedResult}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Icon name="timer" size={24} color="#2c3e50" />
-            <Text style={styles.cardTitle}>Next Check</Text>
-          </View>
-          <Text style={styles.timerText}>{timer} seconds</Text>
-        </View>
-      </ScrollView>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalView}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Scam History</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Icon name="close" size={24} color="#2c3e50" />
+              <Text style={styles.modalText}>Countdown: {countdown}s</Text>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => setModalVisible(false)}>
+                <Text style={styles.buttonText}>Close</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalScroll}>
-              {scamMessages.map((message, index) => (
-                <View key={index} style={styles.modalMessageContainer}>
-                  <Text style={styles.modalMessageNumber}>
-                    {message.scam_no}
-                  </Text>
-                  <Text style={styles.modalMessage}>{message.scam_mes}</Text>
-                </View>
-              ))}
-            </ScrollView>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -453,109 +319,86 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1e272e',
+    backgroundColor: '#f8f9fa',
   },
-  scrollContent: {
-    padding: 20,
+  scrollViewContent: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginLeft: 10,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
+    backgroundColor: '#343a40',
+    width: '100%',
     padding: 20,
-    marginBottom: 20,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginLeft: 10,
-  },
-  smsSender: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#34495e',
-  },
-  scammer: {
-    color: '#e74c3c',
-    fontWeight: 'bold',
-  },
-  smsBody: {
-    fontSize: 16,
-    color: '#34495e',
-  },
-  predictionResult: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#27ae60',
-  },
-  scamResult: {
-    color: '#e74c3c',
-  },
-  timerText: {
+  headerText: {
+    color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#3498db',
   },
-  apiStatusText: {
+  content: {
+    marginTop: 20,
+    width: '90%',
+    alignItems: 'center',
+  },
+  button: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 5,
+    marginVertical: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
     fontSize: 16,
-    color: '#34495e',
+    fontWeight: 'bold',
   },
-  modalOverlay: {
+  modalButton: {
+    backgroundColor: '#28a745',
+    padding: 15,
+    borderRadius: 5,
+    marginVertical: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  apiStatus: {
+    fontSize: 16,
+    color: '#333',
+    marginVertical: 10,
+  },
+  latestSms: {
+    fontSize: 16,
+    color: '#333',
+    marginVertical: 10,
+  },
+  predictedResult: {
+    fontSize: 16,
+    color: '#333',
+    marginVertical: 10,
+  },
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalView: {
-    width: width * 0.8,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
+  modalContent: {
+    backgroundColor: '#fff',
     padding: 20,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderRadius: 10,
+    width: '80%',
     alignItems: 'center',
-    marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  modalScroll: {
-    maxHeight: 300,
-  },
-  modalMessageContainer: {
     marginBottom: 10,
   },
-  modalMessageNumber: {
+  modalText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#34495e',
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: '#34495e',
+    marginVertical: 5,
   },
 });
 
-export default App;
+export default Sms;

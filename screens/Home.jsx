@@ -1,40 +1,27 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useContext} from 'react';
 import {Text, View, TouchableOpacity} from 'react-native';
-import {auth} from '../firebase'; // Import your Firebase configuration or auth object
-import {useAuthState} from 'react-firebase-hooks/auth'; // Import useAuthState
-import {supabase} from '../supabase';
+import {AuthContext} from '../AuthContext'; // Import AuthContext
 import {useNavigation, useRoute} from '@react-navigation/native';
 
 export default function Home() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [users] = useAuthState(auth);
+  const {user, signOut} = useContext(AuthContext); // Use AuthContext to get user and signOut
   const navigation = useNavigation();
   const route = useRoute();
   const {paramName} = route.params || {}; // Handle cases where params might be undefined
 
   useEffect(() => {
-    // Check if there's a user signed in
-    const unsubscribe = auth.onAuthStateChanged(user => {
-      if (user) {
-        setCurrentUser(user);
-        console.log('User email:', user.email);
-        console.log('User UID:', user.uid);
-      } else {
-        setCurrentUser(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+    if (user) {
+      console.log('User email:', user.email);
+      console.log('User UID:', user.uid);
+    } else {
+      navigation.navigate('Login'); // Redirect to Login if no user
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
-      const {error} = await supabase.auth.signOut();
-      if (error) {
-        throw error;
-      }
-      // Redirect to the login screen or perform any other action after logout
-      navigation.navigate('Login');
+      await signOut();
+      navigation.navigate('Login'); // Redirect to Login after logout
     } catch (error) {
       console.error('Logout error:', error.message);
       // Handle logout error, if any
@@ -45,13 +32,17 @@ export default function Home() {
     <View className="flex flex-col h-full bg-black">
       <View className="flex flex-col mt-5  bg-black ml-2">
         <View className="flex flex-row mx-5">
-          <View className="flex flex-row">
+          <View className="flex flex-row mt-2">
             <Text className="text-[#ddff00] text-2xl font-bold">S</Text>
             <Text className="text-2xl font-bold text-white">camRakshak</Text>
           </View>
-          <Text className="text-2xl font-bold ml-20 pl-20 text-white">
-            Noti
-          </Text>
+          <TouchableOpacity
+            className="bg-[#ddff00] text-black h-12 pr-5  ml-20 rounded-full"
+            onPress={handleLogout}>
+            <Text className="ml-4 mt-2 text-xl text-black font-semibold">
+              Logout
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
       <View className="pt-5 pb-6 bg-[#404040] mx-5 mt-10 rounded-2xl flex flex-col">

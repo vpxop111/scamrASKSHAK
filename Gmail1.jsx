@@ -12,17 +12,11 @@ import {
   AppState,
   StatusBar,
 } from 'react-native';
-import {GoogleSignin} from '@react-native-google-signin/google-signin';
-import {supabase} from './supabase';
-import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {supabase} from './supabase';
+import BackgroundService from 'react-native-background-actions';
 import {useTask} from './TaskContext'; // Import TaskContext
-
-const WEB_CLIENT_ID =
-  '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
-const ANDROID_CLIENT_ID =
-  '483287191355-29itib6r943rprhcruog9s3aifengdmc.apps.googleusercontent.com';
 
 PushNotification.configure({
   onRegister: function (token) {
@@ -44,8 +38,7 @@ const sleep = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
 const Gmail1 = () => {
   const {isTaskRunning, startTask, stopTask} = useTask(); // Use context to manage task
-  const [userInfo, setUserInfo] = useState(null);
-  const [isSigninInProgress, setIsSigninInProgress] = useState(false);
+  const [userEmail, setUserEmail] = useState('example@example.com'); // Static email
   const [latestEmail, setLatestEmail] = useState(null);
   const [latestEmailId, setLatestEmailId] = useState(null);
   const [emailStatus, setEmailStatus] = useState(null);
@@ -63,7 +56,6 @@ const Gmail1 = () => {
   const notifiedScammersRef = useRef({});
 
   useEffect(() => {
-    configureGoogleSignin();
     checkAndStartBackgroundTask();
 
     const backHandler = BackHandler.addEventListener(
@@ -122,67 +114,14 @@ const Gmail1 = () => {
     }
   };
 
-  const configureGoogleSignin = async () => {
-    try {
-      await GoogleSignin.configure({
-        webClientId: WEB_CLIENT_ID,
-        androidClientId: ANDROID_CLIENT_ID,
-        scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-      });
-      console.log('GoogleSignin configured successfully');
-    } catch (error) {
-      console.error('Error configuring Google Sign-In:', error);
-    }
-  };
-
-  const signIn = async () => {
-    if (isSigninInProgress) return;
-
-    setIsSigninInProgress(true);
-    try {
-      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
-      const userInfo = await GoogleSignin.signIn();
-      // Check if userInfo contains the expected data
-      if (userInfo) {
-        setUserInfo(userInfo);
-      } else {
-        Alert.alert('Sign-In Error', 'Unable to get user information.');
-      }
-    } catch (error) {
-      console.error('Sign-In Error:', error.message);
-      Alert.alert(
-        'Sign-In Error',
-        'An error occurred during sign-in. Please try again.',
-      );
-    } finally {
-      setIsSigninInProgress(false);
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      await GoogleSignin.revokeAccess();
-      await GoogleSignin.signOut();
-      setUserInfo(null);
-      setLatestEmail(null);
-      setLatestEmailId(null);
-      setEmailStatus(null);
-      setConfidence(null);
-    } catch (error) {
-      console.error('Sign out error:', error);
-      Alert.alert('Error', 'An error occurred while signing out');
-    }
-  };
-
   const fetchLatestEmail = useCallback(async () => {
-    if (isLoading || !userInfo) return;
+    if (isLoading || !userEmail) return;
     setIsLoading(true);
     try {
-      const {accessToken} = await GoogleSignin.getTokens();
       const response = await fetch(
         'https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=1',
         {
-          headers: {Authorization: `Bearer ${accessToken}`},
+          headers: {Authorization: `Bearer YOUR_ACCESS_TOKEN`}, // Use your access token
         },
       );
       const data = await response.json();
@@ -193,7 +132,7 @@ const Gmail1 = () => {
           const messageResponse = await fetch(
             `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}`,
             {
-              headers: {Authorization: `Bearer ${accessToken}`},
+              headers: {Authorization: `Bearer YOUR_ACCESS_TOKEN`}, // Use your access token
             },
           );
           const messageData = await messageResponse.json();
@@ -208,7 +147,7 @@ const Gmail1 = () => {
       setIsLoading(false);
       setTimer(60);
     }
-  }, [latestEmailId, isLoading, userInfo]);
+  }, [latestEmailId, isLoading, userEmail]);
 
   const base64UrlDecode = str => {
     try {
@@ -337,97 +276,69 @@ const Gmail1 = () => {
   };
 
   const backgroundTask = async taskData => {
-    await sleep(1000);
+    const {timeout} = taskData;
     while (BackgroundService.isRunning()) {
-      fetchLatestEmail();
-      await sleep(60000); // Check email every minute
+      await fetchLatestEmail();
+      await sleep(60000); // Sleep for 1 minute
     }
   };
 
   const taskConfig = {
-    taskName: 'GmailChecker',
-    taskTitle: 'Gmail Checker',
-    taskDesc: 'Checking Gmail for new emails',
+    taskName: 'GmailTask',
+    taskTitle: 'Gmail Scanning',
+    taskDesc: 'Scanning Gmail for new emails',
     taskIcon: {name: 'ic_launcher', type: 'mipmap'},
     color: '#ff00ff',
-    parameters: {delay: 10000},
+    linkingURI: 'yourapp://chat', // Update with your app's URI scheme
+    parameters: {
+      timeout: 5000,
+    },
   };
 
-  const handleStartStopTask = () => {
+  const handleEmailScan = () => {
     if (isTaskRunning) {
-      stopTask(); // Stop task using context
+      stopTask(); // Use context to stop the task
     } else {
-      startTask(); // Start task using context
+      startBackgroundTask(); // Use context to start the task
     }
+  };
+
+  const handleSettingsPress = () => {
+    setModalVisible(true);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        <View style={styles.mainContent}>
-          <Text style={styles.title}>Gmail Background Task</Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={isTaskRunning ? stopBackgroundTask : startBackgroundTask}>
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.header}>
+          <Text style={styles.title}>Gmail Scanning</Text>
+        </View>
+        <View style={styles.body}>
+          <TouchableOpacity style={styles.button} onPress={handleEmailScan}>
             <Text style={styles.buttonText}>
-              {isTaskRunning ? 'Stop Background Task' : 'Start Background Task'}
+              {isTaskRunning ? 'Stop Scanning' : 'Start Scanning'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={signIn}>
-            <Text style={styles.buttonText}>Sign In</Text>
+          <TouchableOpacity style={styles.button} onPress={handleSettingsPress}>
+            <Text style={styles.buttonText}>Settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={signOut}>
-            <Text style={styles.buttonText}>Sign Out</Text>
-          </TouchableOpacity>
-          <Text style={styles.info}>
-            {latestEmail ? `Latest Email ID: ${latestEmailId}` : 'No new email'}
-          </Text>
-          <Text style={styles.info}>
-            {emailStatus ? `Status: ${emailStatus}` : 'No status'}
-          </Text>
-          <Text style={styles.info}>
-            {confidence ? `Confidence: ${confidence}` : 'No confidence'}
-          </Text>
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerText}>Timer: {timer}s</Text>
+          <View style={styles.emailContainer}>
+            <Text style={styles.emailHeader}>Latest Email Status:</Text>
+            <Text style={styles.emailText}>{emailStatus}</Text>
+            <Text style={styles.emailText}>Confidence: {confidence}</Text>
+            <Text style={styles.emailText}>Timer: {timer}s</Text>
           </View>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => setModalVisible(true)}>
-            <Text style={styles.buttonText}>Show Scam Emails</Text>
-          </TouchableOpacity>
-          {scammerStatus.isScammer && (
-            <Text style={styles.warning}>
-              Warning: Scam email detected from {scammerStatus.checkedSender}
-            </Text>
-          )}
         </View>
       </ScrollView>
-
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}>
+      <Modal transparent={true} visible={modalVisible} animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Scam Emails</Text>
-            {scamEmails.length > 0 ? (
-              scamEmails.map((email, index) => (
-                <View key={index} style={styles.emailContainer}>
-                  <Text style={styles.emailText}>Sender: {email.sender}</Text>
-                  <Text style={styles.emailText}>Subject: {email.subject}</Text>
-                  <Text style={styles.emailText}>Body: {email.body}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noEmails}>No scam emails found</Text>
-            )}
+            <Text style={styles.modalTitle}>Settings</Text>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.modalButton}
               onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeButtonText}>Close</Text>
+              <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -439,54 +350,42 @@ const Gmail1 = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
   },
-  scrollViewContent: {
+  contentContainer: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mainContent: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 10,
-    backgroundColor: '#f9f9f9',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+  header: {
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+  },
+  body: {
+    alignItems: 'center',
   },
   button: {
     backgroundColor: '#007bff',
-    padding: 15,
+    padding: 10,
     borderRadius: 5,
-    marginVertical: 10,
-    alignItems: 'center',
+    margin: 10,
   },
   buttonText: {
-    color: '#ffffff',
+    color: '#fff',
     fontSize: 16,
   },
-  info: {
-    fontSize: 16,
-    marginVertical: 5,
+  emailContainer: {
+    marginTop: 20,
   },
-  timerContainer: {
-    marginVertical: 10,
-  },
-  timerText: {
+  emailHeader: {
     fontSize: 18,
+    fontWeight: 'bold',
   },
-  warning: {
-    color: '#ff0000',
+  emailText: {
     fontSize: 16,
-    marginTop: 10,
   },
   modalContainer: {
     flex: 1,
@@ -496,38 +395,23 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
+    backgroundColor: '#fff',
     padding: 20,
     borderRadius: 10,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  emailContainer: {
-    marginVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#cccccc',
-    paddingBottom: 10,
-    width: '100%',
-  },
-  emailText: {
-    fontSize: 16,
-  },
-  noEmails: {
-    fontSize: 16,
-    color: '#888888',
-  },
-  closeButton: {
+  modalButton: {
     backgroundColor: '#007bff',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
-  closeButtonText: {
-    color: '#ffffff',
+  modalButtonText: {
+    color: '#fff',
     fontSize: 16,
   },
 });
