@@ -17,6 +17,7 @@ import {supabase} from './supabase';
 import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useTask} from './TaskContext'; // Import TaskContext
 
 const WEB_CLIENT_ID =
   '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
@@ -42,6 +43,7 @@ PushNotification.configure({
 const sleep = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
 const Gmail1 = () => {
+  const {isTaskRunning, startTask, stopTask} = useTask(); // Use context to manage task
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
@@ -57,7 +59,6 @@ const Gmail1 = () => {
   });
   const [scamEmails, setScamEmails] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [isTaskRunning, setIsTaskRunning] = useState(false);
   const scammerCacheRef = useRef({});
   const notifiedScammersRef = useRef({});
 
@@ -70,7 +71,6 @@ const Gmail1 = () => {
       onBackPress,
     );
 
-    // Use AppState instead of Gmail1State
     const appStateSubscription = AppState.addEventListener(
       'change',
       handleAppStateChange,
@@ -115,7 +115,7 @@ const Gmail1 = () => {
         'isBackgroundTaskStarted',
       );
       if (isTaskStarted === 'true') {
-        setIsTaskRunning(true);
+        startTask(); // Start task using context
       }
     } catch (error) {
       console.error('Error checking background task status:', error);
@@ -125,7 +125,6 @@ const Gmail1 = () => {
   const configureGoogleSignin = async () => {
     try {
       await GoogleSignin.configure({
-        offlineAccess: true,
         webClientId: WEB_CLIENT_ID,
         androidClientId: ANDROID_CLIENT_ID,
         scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
@@ -143,9 +142,14 @@ const Gmail1 = () => {
     try {
       await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
       const userInfo = await GoogleSignin.signIn();
-      setUserInfo(userInfo);
+      // Check if userInfo contains the expected data
+      if (userInfo) {
+        setUserInfo(userInfo);
+      } else {
+        Alert.alert('Sign-In Error', 'Unable to get user information.');
+      }
     } catch (error) {
-      console.error('Sign-In Error:', error);
+      console.error('Sign-In Error:', error.message);
       Alert.alert(
         'Sign-In Error',
         'An error occurred during sign-in. Please try again.',
@@ -275,258 +279,155 @@ const Gmail1 = () => {
       }));
     } catch (error) {
       console.error('Error sending email to API:', error);
-      setEmailStatus('Error classifying email');
-      setConfidence(null);
+      Alert.alert('Error', 'Failed to send email to the API');
     }
   };
 
   const storeScamEmail = async (sender, subject, body) => {
     try {
       const {data, error} = await supabase
-        .from('Gmailss')
-        .insert([{scam_email: sender, scam_subject: subject, scam_body: body}]);
-
+        .from('scam_emails')
+        .insert([{sender, subject, body, detected_at: new Date()}]);
       if (error) {
-        if (error.code === '23505') {
-          console.log('Scammer email already exists in the database.');
-        } else {
-          throw error;
-        }
+        console.error('Error storing scam email:', error);
       } else {
-        console.log('Scam email successfully stored.');
+        console.log('Scam email stored:', data);
+        setScamEmails(prev => [...prev, {sender, subject, body}]);
       }
     } catch (error) {
-      console.error('Error storing scam email in Supabase: ', error);
+      console.error('Error storing scam email:', error);
+      Alert.alert('Error', 'Failed to store scam email');
     }
   };
 
   const checkIfScammer = async sender => {
-    console.log('Checking if sender is a scammer:', sender);
-
-    if (sender in scammerCacheRef.current) {
-      return scammerCacheRef.current[sender];
-    }
-
     try {
       const {data, error} = await supabase
-        .from('Gmailss')
-        .select('scam_email')
-        .eq('scam_email', sender)
-        .single();
-
+        .from('scammers')
+        .select('sender')
+        .eq('sender', sender);
       if (error) {
         console.error('Error checking scammer status:', error);
-        return false;
       }
-
-      const isScammer = !!data;
-      scammerCacheRef.current[sender] = isScammer;
-
-      console.log(
-        isScammer
-          ? `Scammer detected: ${sender}`
-          : `Sender is not a scammer: ${sender}`,
-      );
-
-      return isScammer;
+      return data.length > 0;
     } catch (error) {
-      console.error('Error in checkIfScammer:', error);
+      console.error('Error checking scammer status:', error);
       return false;
     }
   };
 
-  const fetchScamEmails = async sender => {
+  const startBackgroundTask = async () => {
     try {
-      const {data, error} = await supabase
-        .from('Gmailss')
-        .select('scam_email, scam_subject, scam_body')
-        .eq('scam_email', sender);
-
-      if (error) {
-        throw error;
-      }
-
-      if (data && data.length > 0) {
-        setScamEmails(data);
-        setModalVisible(true);
-      } else {
-        console.log('No scam emails found for this sender');
-        Alert.alert('No Scam Emails', 'No scam emails found for this sender.');
-      }
+      await BackgroundService.start(backgroundTask, taskConfig);
+      await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
     } catch (error) {
-      console.error('Error fetching scam emails:', error);
-      Alert.alert('Error', 'Failed to fetch scam emails. Please try again.');
+      console.error('Error starting background task:', error);
+      Alert.alert('Error', 'Failed to start background task');
     }
   };
 
-  const renderEmailSubject = () => {
-    if (!latestEmail) return null;
-    const subject = latestEmail.payload.headers.find(
-      header => header.name.toLowerCase() === 'subject',
-    );
-    return subject ? subject.value : 'No subject';
+  const stopBackgroundTask = async () => {
+    try {
+      await BackgroundService.stop();
+      await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
+    } catch (error) {
+      console.error('Error stopping background task:', error);
+      Alert.alert('Error', 'Failed to stop background task');
+    }
   };
 
-  const renderEmailSender = () => {
-    if (!latestEmail) return null;
-    const sender = latestEmail.payload.headers.find(
-      header => header.name.toLowerCase() === 'from',
-    );
-    return sender ? sender.value : 'Unknown sender';
+  const backgroundTask = async taskData => {
+    await sleep(1000);
+    while (BackgroundService.isRunning()) {
+      fetchLatestEmail();
+      await sleep(60000); // Check email every minute
+    }
   };
 
-  const veryIntensiveTask = async taskDataArguments => {
-    const {delay} = taskDataArguments;
-    await new Promise(async resolve => {
-      for (let i = 0; BackgroundService.isRunning(); i++) {
-        await fetchLatestEmail();
-        await sleep(delay);
-      }
-    });
-  };
-
-  const options = {
-    taskName: 'Gmail Scanner',
-    taskTitle: 'Gmail Scanner',
-    taskDesc: 'Scanning emails...',
-    taskIcon: {
-      name: 'ic_launcher',
-      type: 'mipmap',
-    },
+  const taskConfig = {
+    taskName: 'GmailChecker',
+    taskTitle: 'Gmail Checker',
+    taskDesc: 'Checking Gmail for new emails',
+    taskIcon: {name: 'ic_launcher', type: 'mipmap'},
     color: '#ff00ff',
-    linkingURI: 'yourSchemeHere://chat/jane',
-    parameters: {
-      delay: 60000,
-    },
+    parameters: {delay: 10000},
   };
 
-  const startTask = async () => {
-    if (!isTaskRunning) {
-      console.log('Starting background task');
-      setIsTaskRunning(true);
-      try {
-        await BackgroundService.start(veryIntensiveTask, options);
-        await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
-      } catch (error) {
-        console.error('Error starting background task:', error);
-        setIsTaskRunning(false);
-      }
-    }
-  };
-
-  const stopTask = async () => {
+  const handleStartStopTask = () => {
     if (isTaskRunning) {
-      console.log('Stopping background task');
-      try {
-        await BackgroundService.stop();
-        setIsTaskRunning(false);
-        await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
-      } catch (error) {
-        console.error('Error stopping background task:', error);
-      }
+      stopTask(); // Stop task using context
+    } else {
+      startTask(); // Start task using context
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollView}>
-        <View style={styles.container}>
-          {!userInfo ? (
-            <TouchableOpacity
-              style={styles.signInButton}
-              onPress={signIn}
-              disabled={isSigninInProgress}>
-              <Text style={styles.buttonText}>Sign in with Google</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.loggedInContainer}>
-              <Text style={styles.loggedInText}>
-                Logged in as: {userInfo.user.email}
-              </Text>
-              <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-                <Text style={styles.buttonText}>Sign out</Text>
-              </TouchableOpacity>
-              {latestEmail ? (
-                <View style={styles.emailContainer}>
-                  <Text style={styles.emailTitle}>Latest Email:</Text>
-                  <Text style={styles.subject}>
-                    Subject: {renderEmailSubject()}
-                  </Text>
-                  <Text style={styles.sender}>
-                    From: {renderEmailSender()}
-                    {scammerStatus.isScammer &&
-                      scammerStatus.checkedSender === renderEmailSender() &&
-                      ' (Scammer)'}
-                  </Text>
-                  {emailStatus && (
-                    <View style={styles.statusContainer}>
-                      <Text style={styles.emailTitle}>Classification:</Text>
-                      <Text
-                        style={[
-                          styles.status,
-                          emailStatus.toLowerCase() === 'scam'
-                            ? styles.scam
-                            : styles.ham,
-                        ]}>
-                        {emailStatus}
-                      </Text>
-                      {confidence !== null && (
-                        <Text style={styles.confidence}>
-                          Confidence: {(confidence * 100).toFixed(2)}%
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={styles.checkScamButton}
-                    onPress={() => fetchScamEmails(renderEmailSender())}
-                    activeOpacity={0.7}>
-                    <Text style={styles.buttonText}>Check Scam History</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <Text style={styles.fetchingText}>
-                  Fetching latest email...
-                </Text>
-              )}
-              <TouchableOpacity
-                style={[styles.startButton, isTaskRunning && styles.stopButton]}
-                onPress={isTaskRunning ? stopTask : startTask}>
-                <Text style={styles.buttonText}>
-                  {isTaskRunning
-                    ? 'Stop Background Task'
-                    : 'Start Background Task'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        <View style={styles.mainContent}>
+          <Text style={styles.title}>Gmail Background Task</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={isTaskRunning ? stopBackgroundTask : startBackgroundTask}>
+            <Text style={styles.buttonText}>
+              {isTaskRunning ? 'Stop Background Task' : 'Start Background Task'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={signIn}>
+            <Text style={styles.buttonText}>Sign In</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={signOut}>
+            <Text style={styles.buttonText}>Sign Out</Text>
+          </TouchableOpacity>
+          <Text style={styles.info}>
+            {latestEmail ? `Latest Email ID: ${latestEmailId}` : 'No new email'}
+          </Text>
+          <Text style={styles.info}>
+            {emailStatus ? `Status: ${emailStatus}` : 'No status'}
+          </Text>
+          <Text style={styles.info}>
+            {confidence ? `Confidence: ${confidence}` : 'No confidence'}
+          </Text>
+          <View style={styles.timerContainer}>
+            <Text style={styles.timerText}>Timer: {timer}s</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => setModalVisible(true)}>
+            <Text style={styles.buttonText}>Show Scam Emails</Text>
+          </TouchableOpacity>
+          {scammerStatus.isScammer && (
+            <Text style={styles.warning}>
+              Warning: Scam email detected from {scammerStatus.checkedSender}
+            </Text>
           )}
         </View>
       </ScrollView>
+
       <Modal
-        animationType="slide"
-        transparent={true}
         visible={modalVisible}
+        transparent
+        animationType="slide"
         onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.centeredView}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>Scam Email History</Text>
-            <ScrollView>
-              {scamEmails.map((email, index) => (
-                <View key={index} style={styles.scamEmailItem}>
-                  <Text style={styles.scamEmailSubject}>
-                    {email.scam_subject}
-                  </Text>
-                  <Text style={styles.scamEmailSender}>{email.scam_email}</Text>
-                  <Text style={styles.scamEmailBody}>{email.scam_body}</Text>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Scam Emails</Text>
+            {scamEmails.length > 0 ? (
+              scamEmails.map((email, index) => (
+                <View key={index} style={styles.emailContainer}>
+                  <Text style={styles.emailText}>Sender: {email.sender}</Text>
+                  <Text style={styles.emailText}>Subject: {email.subject}</Text>
+                  <Text style={styles.emailText}>Body: {email.body}</Text>
                 </View>
-              ))}
-            </ScrollView>
+              ))
+            ) : (
+              <Text style={styles.noEmails}>No scam emails found</Text>
+            )}
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Close</Text>
+              onPress={() => setModalVisible(false)}>
+              <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -536,166 +437,98 @@ const Gmail1 = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-  },
-  scrollView: {
-    flexGrow: 1,
-  },
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  scrollViewContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  mainContent: {
+    margin: 20,
     padding: 20,
+    borderRadius: 10,
+    backgroundColor: '#f9f9f9',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  loggedInContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  loggedInText: {
-    fontSize: 16,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
-    color: '#333',
   },
-  signInButton: {
-    backgroundColor: '#4285F4',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+  button: {
+    backgroundColor: '#007bff',
+    padding: 15,
     borderRadius: 5,
+    marginVertical: 10,
     alignItems: 'center',
-  },
-  signOutButton: {
-    backgroundColor: '#DB4437',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginBottom: 20,
   },
   buttonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: 'bold',
   },
-  emailContainer: {
-    width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  info: {
+    fontSize: 16,
+    marginVertical: 5,
   },
-  emailTitle: {
+  timerContainer: {
+    marginVertical: 10,
+  },
+  timerText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
   },
-  subject: {
+  warning: {
+    color: '#ff0000',
     fontSize: 16,
-    marginBottom: 10,
-    color: '#666',
+    marginTop: 10,
   },
-  sender: {
-    fontSize: 16,
-    marginBottom: 20,
-    color: '#666',
-  },
-  statusContainer: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
-    padding: 10,
-  },
-  status: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  scam: {
-    color: '#D32F2F',
-  },
-  ham: {
-    color: '#388E3C',
-  },
-  confidence: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#666',
-  },
-  fetchingText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  startButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  stopButton: {
-    backgroundColor: '#F44336',
-  },
-  centeredView: {
+  modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalView: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
+  modalContent: {
+    width: '80%',
+    padding: 20,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    maxHeight: '80%',
-    width: '90%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
   },
-  scamEmailItem: {
-    marginBottom: 15,
+  emailContainer: {
+    marginVertical: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#cccccc',
     paddingBottom: 10,
+    width: '100%',
   },
-  scamEmailSubject: {
+  emailText: {
     fontSize: 16,
-    fontWeight: 'bold',
   },
-  scamEmailSender: {
-    fontSize: 14,
-    color: '#666',
-  },
-  scamEmailBody: {
-    fontSize: 14,
-    marginTop: 5,
+  noEmails: {
+    fontSize: 16,
+    color: '#888888',
   },
   closeButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 20,
+    backgroundColor: '#007bff',
     padding: 10,
-    elevation: 2,
-    marginTop: 15,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  closeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
   },
 });
 

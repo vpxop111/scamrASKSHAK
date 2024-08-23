@@ -18,15 +18,17 @@ import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from './supabase';
+import {useTask} from './TaskContext'; // Import useTask from TaskContext
 
 const Sms = () => {
+  const {taskStarted, startTask, stopTask} = useTask(); // Use TaskContext
   const [latestSms, setLatestSms] = useState('');
   const [smsSender, setSmsSender] = useState('');
   const [predictedResult, setPredictedResult] = useState('');
   const [apiStatus, setApiStatus] = useState('');
   const [processing, setProcessing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [isTaskRunning, setIsTaskRunning] = useState(false);
+  const [isTaskRunning, setIsTaskRunning] = useState(taskStarted); // Sync with context
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
   const [countdown, setCountdown] = useState(20); // Initial countdown value (in seconds)
 
@@ -204,6 +206,8 @@ const Sms = () => {
     });
   };
 
+  const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+
   const options = {
     taskName: 'SMS Scanner',
     taskTitle: 'SMS Scanner',
@@ -218,10 +222,11 @@ const Sms = () => {
     },
   };
 
-  const startTask = async () => {
+  const startTaskHandler = async () => {
     if (!isTaskRunning) {
       console.log('Starting background task');
       setIsTaskRunning(true);
+      startTask(); // Update context
       try {
         await BackgroundService.start(veryIntensiveTask, options);
         await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
@@ -232,11 +237,12 @@ const Sms = () => {
     }
   };
 
-  const stopTask = async () => {
+  const stopTaskHandler = async () => {
     if (isTaskRunning) {
       console.log('Stopping background task');
       try {
         await BackgroundService.stop();
+        stopTask(); // Update context
         setIsTaskRunning(false);
         setCountdown(20); // Reset countdown when the task stops
         await AsyncStorage.setItem('isBackgroundTaskStarted', 'false');
@@ -249,53 +255,55 @@ const Sms = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.title}>Scam Detection App (SMS)</Text>
-
-        <View style={styles.smsContainer}>
-          <Text style={styles.smsText}>Latest SMS: {latestSms}</Text>
-          <Text style={styles.smsSender}>From: {smsSender}</Text>
-          <Text style={styles.predictedResult}>
-            Prediction: {predictedResult || 'Unknown'}
-          </Text>
-          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
-          <Text style={styles.countdownText}>
-            Next Scan In: {countdown} seconds
-          </Text>
+      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>SMS Scanner</Text>
         </View>
-
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={startTask}
-          disabled={isTaskRunning}>
-          <Text style={styles.startButtonText}>
-            {isTaskRunning ? 'Task Running' : 'Start Background Task'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.stopButton}
-          onPress={stopTask}
-          disabled={!isTaskRunning}>
-          <Text style={styles.stopButtonText}>Stop Background Task</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <ScrollView contentContainerStyle={styles.modalScrollContainer}>
-            {/* Add rendering for scam emails here if needed */}
-          </ScrollView>
+        <View style={styles.content}>
           <TouchableOpacity
-            style={styles.closeModalButton}
-            onPress={() => setModalVisible(false)}>
-            <Text style={styles.closeModalButtonText}>Close</Text>
+            style={styles.button}
+            onPress={isTaskRunning ? stopTaskHandler : startTaskHandler}>
+            <Text style={styles.buttonText}>
+              {isTaskRunning ? 'Stop Task' : 'Start Task'}
+            </Text>
           </TouchableOpacity>
+          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
+          <Text style={styles.predictedResult}>
+            Predicted Result: {predictedResult}
+          </Text>
+          <Text style={styles.latestSms}>Latest SMS: {latestSms}</Text>
+          <Text style={styles.smsSender}>Sender: {smsSender}</Text>
+          <Text style={styles.countdown}>
+            {isTaskRunning ? `Countdown: ${countdown}s` : ''}
+          </Text>
         </View>
-      </Modal>
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => {
+            setModalVisible(false);
+          }}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalText}>Are you sure you want to exit?</Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => {
+                setModalVisible(false);
+                BackHandler.exitApp();
+              }}>
+              <Text style={styles.buttonText}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => {
+                setModalVisible(false);
+              }}>
+              <Text style={styles.buttonText}>No</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -303,82 +311,68 @@ const Sms = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f2',
+    backgroundColor: '#ffffff',
   },
-  scrollContainer: {
-    paddingVertical: 20,
-    paddingHorizontal: 10,
+  scrollViewContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 16,
   },
-  title: {
+  header: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerText: {
     fontSize: 24,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
   },
-  smsContainer: {
-    marginBottom: 20,
+  content: {
+    alignItems: 'center',
   },
-  smsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  smsSender: {
-    fontSize: 14,
-  },
-  predictedResult: {
-    marginTop: 5,
-    fontWeight: 'bold',
-  },
-  apiStatus: {
-    marginTop: 5,
-    fontStyle: 'italic',
-  },
-  countdownText: {
-    marginTop: 5,
-    fontWeight: 'bold',
-  },
-  startButton: {
-    backgroundColor: '#5cb85c',
+  button: {
+    backgroundColor: '#007bff',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 5,
     marginBottom: 10,
   },
-  startButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 16,
   },
-  stopButton: {
-    backgroundColor: '#d9534f',
-    padding: 10,
-    borderRadius: 8,
+  apiStatus: {
+    fontSize: 16,
+    marginBottom: 10,
   },
-  stopButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  predictedResult: {
+    fontSize: 16,
+    marginBottom: 10,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  latestSms: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  smsSender: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  countdown: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 35,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  modalScrollContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 8,
-    width: '80%',
-  },
-  closeModalButton: {
-    marginTop: 10,
-    backgroundColor: '#d9534f',
-    padding: 10,
-    borderRadius: 8,
-  },
-  closeModalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  modalText: {
+    marginBottom: 15,
     textAlign: 'center',
   },
 });
