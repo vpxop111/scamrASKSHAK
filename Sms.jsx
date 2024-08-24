@@ -12,6 +12,7 @@ import {
   AppState,
   StatusBar,
   PermissionsAndroid,
+  FlatList,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 import BackgroundService from 'react-native-background-actions';
@@ -19,7 +20,6 @@ import PushNotification from 'react-native-push-notification';
 import {supabase} from './supabase'; // Import your Supabase client instance
 import {useTask} from './TaskContext'; // Import useTask from TaskContext
 import {AuthContext} from './AuthContext';
-import Smsnotifi from './Smsnotifi';
 
 const Sms = () => {
   const {user, signOut} = useContext(AuthContext); // Use AuthContext to get user and signOut
@@ -33,6 +33,7 @@ const Sms = () => {
   const [isTaskRunning, setIsTaskRunning] = useState(taskStarted); // Sync with context
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
   const [countdown, setCountdown] = useState(20); // Initial countdown value (in seconds)
+  const [scamMessages, setScamMessages] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -71,6 +72,33 @@ const Sms = () => {
       clearInterval(timer); // Clear the interval on component unmount
     };
   }, [isTaskRunning, countdown]);
+
+  const fetchScamMessages = async () => {
+    try {
+      const {data, error} = await supabase
+        .from('scamsms')
+        .select('*')
+        .eq('sid', user.email);
+
+      if (error) {
+        console.error('Error fetching scam messages:', error);
+      } else {
+        setScamMessages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching scam messages:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchScamMessages();
+
+    const intervalId = setInterval(() => {
+      fetchScamMessages();
+    }, 20000); // Fetch every 5 minutes
+
+    return () => clearInterval(intervalId);
+  }, [user.email]);
 
   const onBackPress = () => {
     if (isTaskRunning) {
@@ -163,6 +191,7 @@ const Sms = () => {
 
       if (error) {
         if (error.code === '23505') {
+          // Duplicate entry detected
           console.log('Scam message already exists in the database.');
         } else {
           throw error;
@@ -190,7 +219,7 @@ const Sms = () => {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
 
       const {data, error} = await supabase
-        .from('scamsms') // Change this to the correct table name if needed
+        .from('scammers') // Adjust table name if necessary
         .insert([
           {scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email}, // Use user.email directly
         ]);
@@ -206,6 +235,27 @@ const Sms = () => {
       }
     } catch (error) {
       console.error('Error storing scam message in scammers: ', error);
+    }
+  };
+
+  const deleteScamMessage = async id => {
+    try {
+      // Delete the row from the 'scamsms' table where the ID matches
+      const {error} = await supabase.from('scamsms').delete().eq('id', id);
+
+      if (error) {
+        throw error; // Throw error if something went wrong
+      } else {
+        console.log('Scam message successfully deleted from scamsms.');
+        showNotification(
+          'Message Deleted',
+          'The scam message has been removed.',
+        );
+        // Refresh the list after deletion
+        fetchScamMessages();
+      }
+    } catch (error) {
+      console.error('Error deleting scam message:', error);
     }
   };
 
@@ -235,126 +285,89 @@ const Sms = () => {
         await storeScamMessage(sender, message); // Store in scammers table
         await storeScamMessageInScamsms(sender, message); // Store in scamsms table
 
-        // Show notification for detected scam SMS
-        PushNotification.localNotification({
-          channelId: 'default-channel-id',
-          title: 'Scam SMS Detected',
-          message: `Scam SMS from ${sender}`,
-          bigText: `Message: ${message}`,
-        });
+        showNotification(
+          'Scam Alert',
+          `Message from ${sender} is detected as scam.`,
+        );
+      } else {
+        showNotification(
+          'Legitimate Message',
+          `Message from ${sender} is detected as legitimate.`,
+        );
       }
     } catch (error) {
-      console.error('Error sending message to API: ', error);
-      setPredictedResult('Error sending message to API');
-      setApiStatus('Error sending message to API');
+      console.error('Error sending message to API:', error);
+      setApiStatus('Error');
     } finally {
       setProcessing(false);
     }
   };
 
-  const veryIntensiveTask = async taskDataArguments => {
-    const {delay} = taskDataArguments;
-    await new Promise(async resolve => {
-      for (let i = 0; BackgroundService.isRunning(); i++) {
-        await readLatestSMS(); // Fetch the latest SMS
-        await sleep(delay); // Delay for next iteration
-      }
+  const showNotification = (title, message) => {
+    PushNotification.localNotification({
+      channelId: 'default-channel-id', // Ensure channelId is correct or defined elsewhere
+      title,
+      message,
     });
   };
 
-  const sleep = time => new Promise(resolve => setTimeout(resolve, time));
-
-  const options = {
-    taskName: 'SMS Scanner',
-    taskTitle: 'SMS Scanner',
-    taskDesc: 'Scanning for spam SMS...',
-    taskIcon: {
-      name: 'ic_launcher',
-      type: 'mipmap',
-    },
-    color: '#ff00ff',
-    parameters: {
-      delay: 20000, // Check every 20 seconds
-    },
+  const onStartTaskPress = async () => {
+    await startTask();
+    setIsTaskRunning(true);
+    showNotification(
+      'Background Task Started',
+      'The background task for SMS detection has started.',
+    );
   };
 
-  const startTaskHandler = async () => {
-    if (!isTaskRunning) {
-      console.log('Starting background task');
-      setIsTaskRunning(true);
-      await startTask(options, veryIntensiveTask);
-    } else {
-      console.log('Background task is already running');
-    }
-  };
-
-  const stopTaskHandler = async () => {
-    if (isTaskRunning) {
-      console.log('Stopping background task');
-      setIsTaskRunning(false);
-      await stopTask();
-    } else {
-      console.log('No background task running');
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      // Handle any additional logout logic if needed
-    } catch (error) {
-      console.error('Error during logout: ', error);
-    }
+  const onStopTaskPress = async () => {
+    await stopTask();
+    setIsTaskRunning(false);
+    showNotification(
+      'Background Task Stopped',
+      'The background task for SMS detection has been stopped.',
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.inner}>
-          <Text style={styles.header}>SMS Scanner</Text>
-          <Text style={styles.smsContent}>{latestSms}</Text>
-          <Text style={styles.sender}>From: {smsSender}</Text>
-          <Text style={styles.prediction}>Prediction: {predictedResult}</Text>
-          <Text style={styles.apiStatus}>API Status: {apiStatus}</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Scam Message Detection</Text>
+      </View>
+      <ScrollView>
+        <View style={styles.content}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={isTaskRunning ? onStopTaskPress : onStartTaskPress}>
+            <Text style={styles.buttonText}>
+              {isTaskRunning ? 'Stop Background Task' : 'Start Background Task'}
+            </Text>
+          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={startTaskHandler}
-            disabled={isTaskRunning || processing}>
-            <Text style={styles.buttonText}>Start Task</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={stopTaskHandler}
-            disabled={!isTaskRunning || processing}>
-            <Text style={styles.buttonText}>Stop Task</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={handleLogout}>
-            <Text style={styles.buttonText}>Logout</Text>
-          </TouchableOpacity>
+          <FlatList
+            data={scamMessages}
+            keyExtractor={item => item.id.toString()}
+            renderItem={({item}) => (
+              <View style={styles.messageContainer}>
+                <Text>From: {item.scam_no}</Text>
+                <Text>Message: {item.scam_mes}</Text>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => deleteScamMessage(item.id)}>
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+
+          {processing && <Text>Processing...</Text>}
+          <Text>Latest SMS: {latestSms}</Text>
+          <Text>Sender: {smsSender}</Text>
+          <Text>Prediction: {predictedResult}</Text>
+          <Text>API Status: {apiStatus}</Text>
         </View>
       </ScrollView>
-      <Modal
-        transparent={true}
-        animationType="slide"
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalText}>Background Task Status</Text>
-            <Text style={styles.modalText}>
-              {isTaskRunning ? 'Running' : 'Stopped'}
-            </Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      <Smsnotifi />
     </SafeAreaView>
   );
 };
@@ -362,80 +375,47 @@ const Sms = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  inner: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
+    backgroundColor: '#ffffff',
   },
   header: {
-    fontSize: 24,
+    padding: 16,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerText: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
   },
-  smsContent: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  sender: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  prediction: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  apiStatus: {
-    fontSize: 16,
-    marginBottom: 16,
+  content: {
+    padding: 16,
   },
   button: {
+    padding: 16,
     backgroundColor: '#007bff',
-    padding: 12,
-    borderRadius: 4,
-    marginVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   buttonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 16,
     textAlign: 'center',
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
+  messageContainer: {
+    padding: 16,
+    backgroundColor: '#f1f1f1',
     borderRadius: 8,
-    width: '80%',
-    alignItems: 'center',
+    marginBottom: 8,
   },
-  modalText: {
-    fontSize: 18,
-    marginBottom: 16,
-  },
-  modalButton: {
-    backgroundColor: '#007bff',
-    padding: 12,
-    borderRadius: 4,
+  deleteButton: {
     marginTop: 8,
+    backgroundColor: '#ff4d4d',
+    padding: 8,
+    borderRadius: 4,
   },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  deleteButtonText: {
+    color: '#ffffff',
+    textAlign: 'center',
   },
 });
 
