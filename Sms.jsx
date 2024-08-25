@@ -15,7 +15,6 @@ import {
   FlatList,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
-import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import {supabase} from './supabase'; // Import your Supabase client instance
 import {useTask} from './TaskContext'; // Import useTask from TaskContext

@@ -37,12 +37,45 @@ const ANDROID_CLIENT_ID =
 
 // Push Notification Configuration
 PushNotification.configure({
-  onRegister: token => console.log('TOKEN:', token),
-  onNotification: notification => console.log('NOTIFICATION:', notification),
-  permissions: {alert: true, badge: true, sound: true},
+  // Called when Token is generated (iOS and Android)
+  onRegister: token => {
+    console.log('TOKEN:', token);
+    // You can send this token to your server for notification targeting
+  },
+
+  // Called when a remote or local notification is opened or received
+  onNotification: notification => {
+    console.log('NOTIFICATION:', notification);
+    // Process the notification here (e.g., navigate to a screen)
+    notification.finish(PushNotificationIOS.FetchResult.NoData);
+  },
+
+  // Android only: Can be used to configure the notification settings
+  permissions: {
+    alert: true,
+    badge: true,
+    sound: true,
+  },
+
+  // Set to true to automatically handle notifications when the app is not in the foreground
   popInitialNotification: true,
-  requestPermissions: true,
+
+  // Request permissions on iOS
+  requestPermissions: Platform.OS === 'ios',
 });
+
+// Create a notification channel (Android only)
+PushNotification.createChannel(
+  {
+    channelId: 'default', // (required) Channel ID
+    channelName: 'Default channel', // (required) Channel Name
+    channelDescription: 'A default channel', // (optional) Channel Description
+    soundName: 'default', // (optional) Default sound
+    importance: 4, // (optional) Importance level (4 is high priority)
+    vibrate: true, // (optional) Enable vibration
+  },
+  created => console.log(`createChannel returned '${created}'`),
+);
 
 const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
@@ -206,9 +239,30 @@ const Gmail1 = () => {
       Alert.alert('Error', 'Failed to fetch the latest email');
     } finally {
       setIsLoading(false);
-      setTimer(60);
     }
   }, [latestEmailId, isLoading, userInfo]);
+
+  // Timer countdown in seconds
+
+  useEffect(() => {
+    // Fetch immediately on mount
+    fetchLatestEmail();
+
+    // Set up the timer interval
+    const intervalId = setInterval(() => {
+      setTimer(prevTimer => {
+        if (prevTimer <= 1) {
+          // Fetch email when timer hits zero
+          fetchLatestEmail();
+          return 60; // Reset timer
+        }
+        return prevTimer - 1;
+      });
+    }, 1000); // Update timer every second
+
+    // Clear interval on unmount
+    return () => clearInterval(intervalId);
+  }, [fetchLatestEmail]);
 
   const base64UrlDecode = str => {
     try {
@@ -257,12 +311,15 @@ const Gmail1 = () => {
         await storeScamEmail(sender, subject, body);
         setScammerStatus(prev => ({...prev, isScammer: true, stored: true}));
         scammerCacheRef.current[sender] = true;
+
         PushNotification.localNotification({
           channelId: 'default',
           title: 'Scam Email Detected!',
           message: `Scam email detected from ${sender}.`,
           playSound: true,
           soundName: 'default',
+          importance: 'high', // for Android
+          vibrate: true, // for Android
         });
       } else {
         setScammerStatus(prev => ({...prev, isScammer: false}));
@@ -275,12 +332,12 @@ const Gmail1 = () => {
 
   const storeScamEmail = async (sender, subject, body) => {
     try {
-      const {data, error} = await supabase.from('scam_gmail').insert([
+      const {data, error} = await supabase.from('scam_email').insert([
         {
           sid: user.email,
-          sender,
-          subject,
-          body,
+          sender: sender,
+          scam_head: subject,
+          scam_body: body,
         },
       ]);
       if (error) {
@@ -296,7 +353,7 @@ const Gmail1 = () => {
   const fetchScamEmails = async () => {
     try {
       const {data, error} = await supabase
-        .from('scam_gmail')
+        .from('scam_email')
         .select('*')
         .eq('sid', user.email);
       if (error) {
@@ -382,22 +439,19 @@ const Gmail1 = () => {
 
   const deleteScamEmail = async id => {
     try {
-      // Delete the row from the 'scam_gmail' table where the ID matches
-      const {error} = await supabase
-        .from('scam_gmail') // Ensure the table name is correct
-        .delete()
-        .eq('id', id); // Ensure 'id' is the correct column name for the primary key
+      // Delete the row from the 'scamsms' table where the ID matches
+      const {error} = await supabase.from('scam_email').delete().eq('id', id);
 
       if (error) {
         throw error; // Throw error if something went wrong
       } else {
-        console.log('Scam email successfully deleted from scam_gmail.');
+        console.log('Scam message successfully deleted from scamsms.');
 
         // Refresh the list after deletion
-        fetchScamEmails(); // Ensure this function is defined and correctly refreshes the list
+        fetchScamEmails();
       }
     } catch (error) {
-      console.error('Error deleting scam email:', error);
+      console.error('Error deleting scam message:', error);
     }
   };
 
@@ -446,19 +500,21 @@ const Gmail1 = () => {
       {/* FlatList for Scam Emails */}
       <FlatList
         data={scamEmails}
-        keyExtractor={item => item.sid.toString()} // Assuming 'sid' is unique
+        keyExtractor={(item, index) =>
+          item.id ? item.id.toString() : index.toString()
+        } // Use item.id or fallback to index
         renderItem={({item}) => (
-          <View style={styles.scamItem}>
-            <Text style={styles.scamSubject}>{item.scam_subject}</Text>
-            <Text style={styles.scamBody}>{item.scam_body}</Text>
+          <View style={styles.emailItem}>
+            <Text style={styles.emailSender}>{item.sender}</Text>
+            <Text style={styles.emailSubject}>{item.scam_head}</Text>
+            <Text style={styles.emailBody}>{item.scam_body}</Text>
             <TouchableOpacity
               style={styles.deleteButton}
-              onPress={() => deleteScamEmail(item)}>
-              <Text style={styles.deleteButtonText}>Delete</Text>
+              onPress={() => deleteScamEmail(item.id)}>
+              <Text style={styles.buttonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         )}
-        ListEmptyComponent={<Text>No scam emails detected.</Text>}
       />
 
       <TouchableOpacity

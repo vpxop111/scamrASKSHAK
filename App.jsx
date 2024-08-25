@@ -17,9 +17,9 @@ import Resource from './screens/Resource';
 import Scamai from './screens/Scamai';
 import Scams from './screens/Scams';
 import Gmail1 from './Gmail1';
-import Phoencall from './screens/Phoencall';
 import Sms from './Sms';
 import Website from './screens/Website';
+import Phone from './screens/Phone';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -54,7 +54,7 @@ const App = () => {
               initialParams={{paramName: 'navigation'}}
             />
             <Stack.Screen name="gmail" component={Gmail1} />
-            <Stack.Screen name="phone" component={Phoencall} />
+            <Stack.Screen name="phone" component={Phone} />
             <Stack.Screen name="sms" component={Sms} />
             <Stack.Screen name="website" component={Website} />
           </Stack.Navigator>

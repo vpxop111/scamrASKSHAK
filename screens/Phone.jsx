@@ -18,30 +18,29 @@ import {AuthContext} from '../AuthContext';
 
 const formatPhoneNumber = phoneNumber => {
   if (!phoneNumber) return '';
-  const cleaned = phoneNumber.replace(/\D/g, ''); // Remove non-digit characters
-
-  // Ensure at least 10 digits for a valid US number
+  const cleaned = phoneNumber.replace(/\D/g, '');
   if (cleaned.length < 10) return '';
-
-  // Format it as +1 (650) 555-1212
-  return `+1 ${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(
+    6,
+  )}`;
 };
 
 const Phone = () => {
-  const {user, signOut} = useContext(AuthContext); // Use AuthContext to get user and signOut
-  const {taskStarted, startTask, stopTask} = useTask(); // Use TaskContext
+  const {user, signOut} = useContext(AuthContext);
+  const {taskStarted, startTask, stopTask} = useTask();
   const [incomingCallNumber, setIncomingCallNumber] = useState(null);
   const [isIncomingCallScammer, setIsIncomingCallScammer] = useState(false);
-  const [isTaskRunning, setIsTaskRunning] = useState(taskStarted); // Sync with context
+  const [isTaskRunning, setIsTaskRunning] = useState(taskStarted);
 
   const callDetector = useRef(null);
 
   useEffect(() => {
     if (user) {
       console.log('User email:', user.email);
-      console.log('User UID:', user.uid);
+      console.log('User UID:', user.id); // Changed from user.uid to user.id for Supabase
     } else {
-      navigation.navigate('Login'); // Redirect to Login if no user
+      // Assuming you have access to navigation
+      // navigation.navigate('Login');
     }
   }, [user]);
 
@@ -105,7 +104,7 @@ const Phone = () => {
               setIsIncomingCallScammer(false);
               Alert.alert(
                 'Incoming Call',
-                `Incoming call from: ${number}`,
+                `Incoming call from: ${formatPhoneNumber(number)}`,
                 [{text: 'OK', onPress: () => console.log('Alert closed')}],
                 {cancelable: false},
               );
@@ -128,6 +127,7 @@ const Phone = () => {
   const fetchCallScamDetails = async phoneNumber => {
     try {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      console.log('Fetching scam details for:', cleanPhoneNumber);
       const {data, error} = await supabase
         .from('scammers')
         .select('scam_no, scam_mes')
@@ -138,6 +138,7 @@ const Phone = () => {
         return null;
       }
 
+      console.log('Scam details fetched:', data);
       return data;
     } catch (error) {
       console.error('Error in fetchCallScamDetails:', error);
@@ -147,7 +148,6 @@ const Phone = () => {
 
   const veryIntensiveTask = async taskData => {
     await new Promise(async resolve => {
-      // Simulate an infinite loop to keep the task running
       for (let i = 0; BackgroundService.isRunning(); i++) {
         console.log('Running background task:', i);
         await new Promise(r => setTimeout(r, 1000));
@@ -165,7 +165,7 @@ const Phone = () => {
       type: 'mipmap',
     },
     color: '#ff0000',
-    linkingURI: 'yourSchemeHere://chat/jane', // Check this URI in AndroidManifest
+    linkingURI: 'yourSchemeHere://chat/jane',
     parameters: {
       delay: 1000,
     },
@@ -179,6 +179,7 @@ const Phone = () => {
   };
 
   const onStartTaskPress = async () => {
+    await BackgroundService.start(veryIntensiveTask, options);
     await startTask();
     setIsTaskRunning(true);
     showNotification(
@@ -188,6 +189,7 @@ const Phone = () => {
   };
 
   const onStopTaskPress = async () => {
+    await BackgroundService.stop();
     await stopTask();
     setIsTaskRunning(false);
     showNotification(
@@ -198,7 +200,7 @@ const Phone = () => {
 
   const showNotification = (title, message) => {
     PushNotification.localNotification({
-      channelId: 'default-channel-id', // Ensure channelId is correct or defined elsewhere
+      channelId: 'default-channel-id',
       title,
       message,
     });
@@ -291,3 +293,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default Phone;
