@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   StyleSheet,
   SafeAreaView,
   StatusBar,
@@ -12,8 +11,8 @@ import {
 import CallDetectorManager from 'react-native-call-detection';
 import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
-import {supabase} from '../supabase'; // Import your Supabase client instance
-import {useTask} from '../TaskContext'; // Import useTask from TaskContext
+import {supabase} from '../supabase';
+import {useTask} from '../TaskContext';
 import {AuthContext} from '../AuthContext';
 
 const formatPhoneNumber = phoneNumber => {
@@ -26,33 +25,12 @@ const formatPhoneNumber = phoneNumber => {
 };
 
 const Phone = () => {
-  const {user, signOut} = useContext(AuthContext);
+  const {user} = useContext(AuthContext);
   const {taskStarted, startTask, stopTask} = useTask();
-  const [incomingCallNumber, setIncomingCallNumber] = useState(null);
-  const [isIncomingCallScammer, setIsIncomingCallScammer] = useState(false);
   const [isTaskRunning, setIsTaskRunning] = useState(taskStarted);
-
-  const callDetector = useRef(null);
-
-  useEffect(() => {
-    if (user) {
-      console.log('User email:', user.email);
-      console.log('User UID:', user.id); // Changed from user.uid to user.id for Supabase
-    } else {
-      // Assuming you have access to navigation
-      // navigation.navigate('Login');
-    }
-  }, [user]);
 
   useEffect(() => {
     requestCallPhonePermission();
-    setupCallDetector();
-
-    return () => {
-      if (callDetector.current) {
-        callDetector.current.dispose();
-      }
-    };
   }, []);
 
   const requestCallPhonePermission = async () => {
@@ -79,49 +57,33 @@ const Phone = () => {
   };
 
   const setupCallDetector = () => {
-    try {
-      callDetector.current = new CallDetectorManager(
-        async (event, number) => {
-          if (event === 'Incoming') {
-            console.log('Incoming call from:', number);
-            setIncomingCallNumber(number);
-            const scamDetails = await fetchCallScamDetails(number);
-            if (scamDetails && scamDetails.length > 0) {
-              console.log('Scammer detected:', number);
-              setIsIncomingCallScammer(true);
-              Alert.alert(
-                'Scam Call Detected',
-                `Number: ${scamDetails[0].scam_no}\nMessage: ${scamDetails[0].scam_mes}`,
-                [{text: 'OK', onPress: () => console.log('Alert closed')}],
-                {cancelable: false},
-              );
-              PushNotification.localNotification({
-                channelId: 'default-channel-id',
-                title: 'Scam Call Detected',
-                message: `Number: ${scamDetails[0].scam_no} is a scam number.`,
-              });
-            } else {
-              setIsIncomingCallScammer(false);
-              Alert.alert(
-                'Incoming Call',
-                `Incoming call from: ${formatPhoneNumber(number)}`,
-                [{text: 'OK', onPress: () => console.log('Alert closed')}],
-                {cancelable: false},
-              );
-            }
+    return new CallDetectorManager(
+      async (event, number) => {
+        if (event === 'Incoming') {
+          console.log('Incoming call from:', number);
+          const scamDetails = await fetchCallScamDetails(number);
+          if (scamDetails && scamDetails.length > 0) {
+            console.log('Scammer detected:', number);
+            showNotification(
+              'Scam Call Detected',
+              `Number: ${scamDetails[0].scam_no} is a scam number.`,
+            );
+          } else {
+            showNotification(
+              'Incoming Call',
+              `Call from: ${formatPhoneNumber(number)}`,
+            );
           }
-        },
-        true,
-        () => {
-          console.log('Call Detector initialized successfully');
-        },
-        err => {
-          console.error('Call Detector failed to initialize', err);
-        },
-      );
-    } catch (error) {
-      console.error('Error setting up Call Detector:', error);
-    }
+        }
+      },
+      true,
+      () => {
+        console.log('Call Detector initialized successfully');
+      },
+      err => {
+        console.error('Call Detector failed to initialize', err);
+      },
+    );
   };
 
   const fetchCallScamDetails = async phoneNumber => {
@@ -146,12 +108,13 @@ const Phone = () => {
     }
   };
 
-  const veryIntensiveTask = async taskData => {
+  const backgroundTask = async taskData => {
     await new Promise(async resolve => {
-      for (let i = 0; BackgroundService.isRunning(); i++) {
-        console.log('Running background task:', i);
+      const callDetector = setupCallDetector();
+      while (BackgroundService.isRunning()) {
         await new Promise(r => setTimeout(r, 1000));
       }
+      callDetector.dispose();
       resolve();
     });
   };
@@ -169,33 +132,26 @@ const Phone = () => {
     parameters: {
       delay: 1000,
     },
-    notifications: {
-      foreground: false,
-      priority: 'high',
-      sticky: true,
-      alertAction: 'view',
-      actions: ['Stop Task'],
-    },
   };
 
   const onStartTaskPress = async () => {
-    await BackgroundService.start(veryIntensiveTask, options);
-    await startTask();
-    setIsTaskRunning(true);
-    showNotification(
-      'Background Task Started',
-      'The background task for call detection has started.',
-    );
+    try {
+      await BackgroundService.start(backgroundTask, options);
+      await startTask();
+      setIsTaskRunning(true);
+    } catch (error) {
+      console.error('Failed to start background task:', error);
+    }
   };
 
   const onStopTaskPress = async () => {
-    await BackgroundService.stop();
-    await stopTask();
-    setIsTaskRunning(false);
-    showNotification(
-      'Background Task Stopped',
-      'The background task for call detection has been stopped.',
-    );
+    try {
+      await BackgroundService.stop();
+      await stopTask();
+      setIsTaskRunning(false);
+    } catch (error) {
+      console.error('Failed to stop background task:', error);
+    }
   };
 
   const showNotification = (title, message) => {
@@ -213,20 +169,6 @@ const Phone = () => {
         <Text style={styles.headerText}>Scam Call Detection</Text>
       </View>
       <View style={styles.content}>
-        <View style={styles.card}>
-          {incomingCallNumber ? (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Incoming Call</Text>
-              </View>
-              <Text style={styles.smsSender}>
-                From: {formatPhoneNumber(incomingCallNumber)}{' '}
-                {isIncomingCallScammer && '(Scammer)'}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
         <TouchableOpacity
           style={[
             styles.button,
@@ -234,7 +176,7 @@ const Phone = () => {
           ]}
           onPress={isTaskRunning ? onStopTaskPress : onStartTaskPress}>
           <Text style={styles.buttonText}>
-            {isTaskRunning ? 'Stop Task' : 'Start Task'}
+            {isTaskRunning ? 'Stop Detection' : 'Start Detection'}
           </Text>
         </TouchableOpacity>
       </View>
