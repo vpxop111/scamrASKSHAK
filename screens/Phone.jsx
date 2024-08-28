@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useContext, useRef} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {supabase} from '../supabase';
 import {useTask} from '../TaskContext';
 import {AuthContext} from '../AuthContext';
 
+// Format phone numbers for display
 const formatPhoneNumber = phoneNumber => {
   if (!phoneNumber) return '';
   const cleaned = phoneNumber.replace(/\D/g, '');
@@ -28,11 +29,25 @@ const Phone = () => {
   const {user} = useContext(AuthContext);
   const {taskStarted, startTask, stopTask} = useTask();
   const [isTaskRunning, setIsTaskRunning] = useState(taskStarted);
+  let callDetector = null;
 
   useEffect(() => {
-    requestCallPhonePermission();
+    // Request phone state permission on component mount
+    requestCallPhonePermission().then(permissionGranted => {
+      if (permissionGranted) {
+        setupCallDetector();
+      }
+    });
+
+    // Cleanup call detector on component unmount
+    return () => {
+      if (callDetector) {
+        callDetector.dispose();
+      }
+    };
   }, []);
 
+  // Function to request READ_PHONE_STATE permission
   const requestCallPhonePermission = async () => {
     try {
       const granted = await PermissionsAndroid.request(
@@ -46,46 +61,49 @@ const Phone = () => {
           buttonPositive: 'OK',
         },
       );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log('Phone state permission granted');
-      } else {
-        console.log('Phone state permission denied');
-      }
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
     } catch (err) {
-      console.warn(err);
+      console.warn('Error requesting phone state permission:', err);
+      return false;
     }
   };
 
+  // Function to initialize call detector
   const setupCallDetector = () => {
-    return new CallDetectorManager(
-      async (event, number) => {
-        if (event === 'Incoming') {
-          console.log('Incoming call from:', number);
-          const scamDetails = await fetchCallScamDetails(number);
-          if (scamDetails && scamDetails.length > 0) {
-            console.log('Scammer detected:', number);
-            showNotification(
-              'Scam Call Detected',
-              `Number: ${scamDetails[0].scam_no} is a scam number.`,
-            );
-          } else {
-            showNotification(
-              'Incoming Call',
-              `Call from: ${formatPhoneNumber(number)}`,
-            );
+    try {
+      callDetector = new CallDetectorManager(
+        async (event, number) => {
+          if (event === 'Incoming') {
+            console.log('Incoming call from:', number);
+            const scamDetails = await fetchCallScamDetails(number);
+            if (scamDetails && scamDetails.length > 0) {
+              console.log('Scammer detected:', number);
+              showNotification(
+                'Scam Call Detected',
+                `Number: ${scamDetails[0].scam_no} is a scam number.`,
+              );
+            } else {
+              showNotification(
+                'Incoming Call',
+                `Call from: ${formatPhoneNumber(number)}`,
+              );
+            }
           }
-        }
-      },
-      true,
-      () => {
-        console.log('Call Detector initialized successfully');
-      },
-      err => {
-        console.error('Call Detector failed to initialize', err);
-      },
-    );
+        },
+        true, // True for incoming and outgoing calls
+        () => {
+          console.log('Call Detector initialized successfully');
+        },
+        err => {
+          console.error('Call Detector failed to initialize', err);
+        },
+      );
+    } catch (error) {
+      console.error('Error in setupCallDetector:', error);
+    }
   };
 
+  // Function to fetch scam details for a phone number
   const fetchCallScamDetails = async phoneNumber => {
     try {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
@@ -108,17 +126,19 @@ const Phone = () => {
     }
   };
 
+  // Background task for call detection
   const backgroundTask = async taskData => {
     await new Promise(async resolve => {
-      const callDetector = setupCallDetector();
+      setupCallDetector(); // Setup call detector when background task starts
       while (BackgroundService.isRunning()) {
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1000)); // Wait 1 second
       }
-      callDetector.dispose();
+      callDetector.dispose(); // Dispose call detector when task stops
       resolve();
     });
   };
 
+  // Options for background service
   const options = {
     taskName: 'ScamDetection',
     taskTitle: 'Scam Call Detection Running',
@@ -134,6 +154,7 @@ const Phone = () => {
     },
   };
 
+  // Start background task
   const onStartTaskPress = async () => {
     try {
       await BackgroundService.start(backgroundTask, options);
@@ -144,6 +165,7 @@ const Phone = () => {
     }
   };
 
+  // Stop background task
   const onStopTaskPress = async () => {
     try {
       await BackgroundService.stop();
@@ -154,6 +176,7 @@ const Phone = () => {
     }
   };
 
+  // Function to show notifications
   const showNotification = (title, message) => {
     PushNotification.localNotification({
       channelId: 'default-channel-id',
@@ -201,22 +224,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-  },
-  card: {
-    padding: 16,
-    backgroundColor: '#f1f1f1',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  cardHeader: {
-    marginBottom: 8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  smsSender: {
-    fontSize: 16,
   },
   button: {
     padding: 16,

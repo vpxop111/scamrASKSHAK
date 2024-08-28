@@ -1,36 +1,39 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, FlatList, StyleSheet, Button} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {supabase} from '../supabase'; // Adjust the import path if necessary
 
-const Solution = ({route}) => {
-  const {stype1} = route.params;
-  const [solutions, setSolutions] = useState([]);
+export default function Scams() {
+  const [scams, setScams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    const fetchDetails = async () => {
+    const getScams = async () => {
       try {
-        // Fetch solutions details where scam_type equals stype1
-        const {data, error} = await supabase
-          .from('solution')
-          .select('scam_name, Solution')
-          .eq('scam_type', stype1);
+        const {data, error} = await supabase.from('scam').select();
 
         if (error) {
-          console.error('Error fetching solutions:', error.message);
+          console.error('Error fetching scams:', error.message);
           return;
         }
 
-        setSolutions(data);
+        if (data) {
+          // Filter out duplicate scam types
+          const uniqueScams = Array.from(
+            new Set(data.map(scam => scam.scam_type)),
+          ).map(scam_type => data.find(scam => scam.scam_type === scam_type));
+          setScams(uniqueScams);
+        }
       } catch (error) {
-        console.error('Error fetching details:', error.message);
+        console.error('Error fetching scams:', error.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDetails();
-  }, [stype1]);
+    getScams();
+  }, []);
 
   if (loading) {
     return (
@@ -40,26 +43,38 @@ const Solution = ({route}) => {
     );
   }
 
+  if (scams.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text>No scams found</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Details for {stype1}</Text>
-      <ScrollView>
-        {solutions.length > 0 ? (
-          <View>
-            {solutions.map((solu, index) => (
-              <View key={index} style={styles.solutionContainer}>
-                <Text style={styles.scamName}>Scam Name: {solu.scam_name}</Text>
-                <Text style={styles.solution}>Solution: {solu.Solution}</Text>
-              </View>
-            ))}
+      <Text style={styles.title}>Scam List</Text>
+      <FlatList
+        data={scams}
+        keyExtractor={item => item.id.toString()}
+        renderItem={({item}) => (
+          <View style={styles.item}>
+            <Button
+              style={styles.itemText}
+              title={item.scam_type}
+              onPress={() =>
+                navigation.navigate('mscam', {
+                  stype: item.scam_type,
+                  s_id: item.id,
+                })
+              }
+            />
           </View>
-        ) : (
-          <Text>No details found for {stype1}</Text>
         )}
-      </ScrollView>
+      />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -72,16 +87,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  scamName: {
+  item: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  itemText: {
     fontSize: 18,
-    marginBottom: 10,
-  },
-  solution: {
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  solutionContainer: {
-    marginBottom: 20,
   },
   center: {
     flex: 1,
@@ -89,5 +101,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
-export default Solution;

@@ -6,30 +6,32 @@ import {
   ActivityIndicator,
   Image,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
 
-const BING_API_KEY = '91e0e28b36c84119b185ba09d7a73f37'; // Replace with your Bing API key
+// Replace with your GNews API key
+const GNEWS_API_KEY = '4e7471e098930c7d98dc3495a9752490';
 
-const Scamnews = () => {
+const Scamnews = ({navigation}) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchNews = async () => {
     try {
-      const response = await axios.get(
-        'https://api.bing.microsoft.com/v7.0/news/search',
-        {
-          params: {q: 'scams in India'},
-          headers: {
-            'Ocp-Apim-Subscription-Key': BING_API_KEY,
-          },
+      const response = await axios.get('https://gnews.io/api/v4/search', {
+        params: {
+          q: 'scam news',
+          lang: 'en',
+          country: 'in',
+          max: 10,
+          apikey: GNEWS_API_KEY,
         },
-      );
-      setNews(response.data.value);
-      setLoading(false);
+      });
+      setNews(response.data.articles);
     } catch (error) {
       console.error(error);
+    } finally {
       setLoading(false);
     }
   };
@@ -40,7 +42,9 @@ const Scamnews = () => {
 
   if (loading) {
     return (
-      <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
     );
   }
 
@@ -50,18 +54,19 @@ const Scamnews = () => {
         data={news}
         keyExtractor={item => item.url}
         renderItem={({item}) => (
-          <View style={styles.newsItem}>
-            {item.image?.thumbnail?.contentUrl && (
-              <Image
-                source={{uri: item.image.thumbnail.contentUrl}}
-                style={styles.thumbnail}
-              />
+          <TouchableOpacity
+            style={styles.newsItem}
+            onPress={() =>
+              navigation.navigate('SpecificNews', {article: item})
+            }>
+            {item.image && (
+              <Image source={{uri: item.image}} style={styles.thumbnail} />
             )}
             <View style={styles.textContainer}>
-              <Text style={styles.title}>{item.name}</Text>
+              <Text style={styles.title}>{item.title}</Text>
               <Text style={styles.description}>{item.description}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>

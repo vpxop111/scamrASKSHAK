@@ -20,6 +20,7 @@ import Gmail1 from './Gmail1';
 import Sms from './Sms';
 import Website from './screens/Website';
 import Phone from './screens/Phone';
+import SpecificNews from './screens/SpecificNews';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -56,7 +57,20 @@ const App = () => {
             <Stack.Screen name="gmail" component={Gmail1} />
             <Stack.Screen name="phone" component={Phone} />
             <Stack.Screen name="sms" component={Sms} />
-            <Stack.Screen name="website" component={Website} />
+            <Stack.Screen
+              name="scam"
+              component={Scams}
+              initialParams={{paramName: 'navigation'}}
+            />
+            <Stack.Screen name="mscam" component={Mainscam} />
+            <Stack.Screen name="news" component={Scamnews} />
+            <Stack.Screen name="scamlist" component={Scam1} />
+            <Stack.Screen name="solution" component={Solution} />
+            <Stack.Screen name="i_law" component={Indian_law} />
+            <Stack.Screen name="u_law" component={UsaLaw} />
+            <Stack.Screen name="resource" component={Resource} />
+            <Stack.Screen name="SpecificNews" component={SpecificNews} />
+            <Stack.Screen name="ai" component={Scamai} />
           </Stack.Navigator>
         </NavigationContainer>
       </TaskProvider>
