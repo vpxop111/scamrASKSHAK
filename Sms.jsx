@@ -13,6 +13,7 @@ import {
   StatusBar,
   PermissionsAndroid,
   FlatList,
+  Platform,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 import BackgroundService from 'react-native-background-actions';
@@ -37,6 +38,7 @@ const Sms = () => {
   useEffect(() => {
     requestReadSmsPermission();
     fetchScamMessages();
+    setupNotifications();
 
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
@@ -63,6 +65,37 @@ const Sms = () => {
       clearInterval(timer);
     };
   }, [isTaskRunning, countdown]);
+
+  const setupNotifications = () => {
+    PushNotification.configure({
+      onRegister: token => {
+        console.log('TOKEN:', token);
+      },
+      onNotification: notification => {
+        console.log('NOTIFICATION:', notification);
+        notification.finish(PushNotification.FetchResult.NoData);
+      },
+      permissions: {
+        alert: true,
+        badge: true,
+        sound: true,
+      },
+      popInitialNotification: true,
+      requestPermissions: Platform.OS === 'ios',
+    });
+
+    PushNotification.createChannel(
+      {
+        channelId: 'default-channel-id',
+        channelName: 'Default channel',
+        channelDescription: 'A default channel for SMS scanner notifications',
+        soundName: 'default',
+        importance: 4,
+        vibrate: true,
+      },
+      created => console.log(`createChannel returned '${created}'`),
+    );
+  };
 
   const onBackPress = () => {
     if (isTaskRunning) {
@@ -164,15 +197,18 @@ const Sms = () => {
       setApiStatus('Success');
 
       if (result.predicted_result.toLowerCase() === 'scam') {
-        setModalVisible(true); // Show modal when a scam SMS is detected
+        setModalVisible(true);
         await storeScamSms(sender, message);
-        await storeScamMessage(sender, message); // Call the new function to store scam message in 'scammers'
+        await storeScamMessage(sender, message);
 
         PushNotification.localNotification({
           channelId: 'default-channel-id',
           title: 'Scam SMS Detected',
           message: `Scam SMS from ${sender}`,
           bigText: `Message: ${message}`,
+          importance: 'high',
+          priority: 'high',
+          ignoreInForeground: false,
         });
       }
     } catch (error) {
@@ -199,9 +235,9 @@ const Sms = () => {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
 
       const {data, error} = await supabase
-        .from('scamsms') // Adjust table name if necessary
+        .from('scamsms')
         .insert([
-          {scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email}, // Use user.email directly
+          {scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email},
         ]);
 
       if (error) {
@@ -264,7 +300,7 @@ const Sms = () => {
         console.error('Error deleting scam message:', error);
       } else {
         console.log('Scam message successfully deleted.');
-        fetchScamMessages(); // Refresh messages after deletion
+        fetchScamMessages();
       }
     } catch (error) {
       console.error('Error deleting scam message:', error);
@@ -275,8 +311,8 @@ const Sms = () => {
     const {delay} = taskDataArguments;
     await new Promise(async resolve => {
       for (let i = 0; BackgroundService.isRunning(); i++) {
-        await readLatestSMS(); // Fetch the latest SMS
-        await sleep(delay); // Delay for next iteration
+        await readLatestSMS();
+        await sleep(delay);
       }
     });
   };
@@ -295,7 +331,7 @@ const Sms = () => {
     color: '#ff00ff',
     linkingURI: 'yourSchemeHere://chat/jane',
     parameters: {
-      delay: 60000, // 1-minute interval
+      delay: 60000,
     },
   };
 
@@ -303,12 +339,30 @@ const Sms = () => {
     if (!isTaskRunning) {
       setIsTaskRunning(true);
       await BackgroundService.start(veryIntensiveTask, options);
+      showPersistentNotification();
     }
   };
 
   const stopTask = async () => {
     await BackgroundService.stop();
     setIsTaskRunning(false);
+    removePersistentNotification();
+  };
+
+  const showPersistentNotification = () => {
+    PushNotification.localNotification({
+      channelId: 'default-channel-id',
+      title: 'SMS Scanner Active',
+      message: 'Scanning for spam SMS in the background',
+      ongoing: true,
+      autoCancel: false,
+      importance: 'high',
+      priority: 'high',
+    });
+  };
+
+  const removePersistentNotification = () => {
+    PushNotification.cancelAllLocalNotifications();
   };
 
   return (

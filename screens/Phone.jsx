@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StatusBar,
   PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import CallDetectorManager from 'react-native-call-detection';
 import BackgroundService from 'react-native-background-actions';
@@ -32,14 +33,13 @@ const Phone = () => {
   let callDetector = null;
 
   useEffect(() => {
-    // Request phone state permission on component mount
+    setupNotifications();
     requestCallPhonePermission().then(permissionGranted => {
       if (permissionGranted) {
         setupCallDetector();
       }
     });
 
-    // Cleanup call detector on component unmount
     return () => {
       if (callDetector) {
         callDetector.dispose();
@@ -47,7 +47,37 @@ const Phone = () => {
     };
   }, []);
 
-  // Function to request READ_PHONE_STATE permission
+  const setupNotifications = () => {
+    PushNotification.configure({
+      onRegister: token => {
+        console.log('TOKEN:', token);
+      },
+      onNotification: notification => {
+        console.log('NOTIFICATION:', notification);
+        notification.finish(PushNotification.FetchResult.NoData);
+      },
+      permissions: {
+        alert: true,
+        badge: true,
+        sound: true,
+      },
+      popInitialNotification: true,
+      requestPermissions: Platform.OS === 'ios',
+    });
+
+    PushNotification.createChannel(
+      {
+        channelId: 'default-channel-id',
+        channelName: 'Default channel',
+        channelDescription: 'A default channel for phone scam detector',
+        soundName: 'default',
+        importance: 4,
+        vibrate: true,
+      },
+      created => console.log(`createChannel returned '${created}'`),
+    );
+  };
+
   const requestCallPhonePermission = async () => {
     try {
       const granted = await PermissionsAndroid.request(
@@ -68,7 +98,6 @@ const Phone = () => {
     }
   };
 
-  // Function to initialize call detector
   const setupCallDetector = () => {
     try {
       callDetector = new CallDetectorManager(
@@ -90,7 +119,7 @@ const Phone = () => {
             }
           }
         },
-        true, // True for incoming and outgoing calls
+        true,
         () => {
           console.log('Call Detector initialized successfully');
         },
@@ -103,7 +132,6 @@ const Phone = () => {
     }
   };
 
-  // Function to fetch scam details for a phone number
   const fetchCallScamDetails = async phoneNumber => {
     try {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
@@ -126,19 +154,19 @@ const Phone = () => {
     }
   };
 
-  // Background task for call detection
   const backgroundTask = async taskData => {
     await new Promise(async resolve => {
-      setupCallDetector(); // Setup call detector when background task starts
+      setupCallDetector();
+      showPersistentNotification();
       while (BackgroundService.isRunning()) {
-        await new Promise(r => setTimeout(r, 1000)); // Wait 1 second
+        await new Promise(r => setTimeout(r, 1000));
       }
-      callDetector.dispose(); // Dispose call detector when task stops
+      callDetector.dispose();
+      removePersistentNotification();
       resolve();
     });
   };
 
-  // Options for background service
   const options = {
     taskName: 'ScamDetection',
     taskTitle: 'Scam Call Detection Running',
@@ -154,7 +182,6 @@ const Phone = () => {
     },
   };
 
-  // Start background task
   const onStartTaskPress = async () => {
     try {
       await BackgroundService.start(backgroundTask, options);
@@ -165,7 +192,6 @@ const Phone = () => {
     }
   };
 
-  // Stop background task
   const onStopTaskPress = async () => {
     try {
       await BackgroundService.stop();
@@ -176,13 +202,28 @@ const Phone = () => {
     }
   };
 
-  // Function to show notifications
   const showNotification = (title, message) => {
     PushNotification.localNotification({
       channelId: 'default-channel-id',
       title,
       message,
     });
+  };
+
+  const showPersistentNotification = () => {
+    PushNotification.localNotification({
+      channelId: 'default-channel-id',
+      title: 'Scam Call Detection Active',
+      message: 'Monitoring for incoming calls',
+      ongoing: true,
+      autoCancel: false,
+      importance: 'high',
+      priority: 'high',
+    });
+  };
+
+  const removePersistentNotification = () => {
+    PushNotification.cancelAllLocalNotifications();
   };
 
   return (
