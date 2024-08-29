@@ -1,16 +1,68 @@
-import React, {useContext} from 'react';
+import React, {useContext, useEffect} from 'react';
 import {
   Alert,
   Text,
   TouchableOpacity,
   View,
   ActivityIndicator,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import {AuthContext} from '../AuthContext'; // Ensure this path is correct
 import Home from './Home';
+import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
 export default function Login({navigation}) {
   const {signIn, user, isSigninInProgress} = useContext(AuthContext);
+
+  useEffect(() => {
+    // Request permissions when the component mounts
+    requestPermissions();
+  }, []);
+
+  const requestPermissions = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        // Request Phone permission
+        const grantedPhone = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+          {
+            title: 'Phone Permission',
+            message: 'This app needs access to your phone to detect calls.',
+            buttonPositive: 'OK',
+          },
+        );
+
+        // Request SMS permission
+        const grantedSMS = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+          {
+            title: 'SMS Permission',
+            message: 'This app needs access to your SMS messages.',
+            buttonPositive: 'OK',
+          },
+        );
+
+        // Request Notification permission
+        const notificationPermission = await request(
+          PERMISSIONS.ANDROID.POST_NOTIFICATIONS,
+        );
+
+        if (
+          grantedPhone !== PermissionsAndroid.RESULTS.GRANTED ||
+          grantedSMS !== PermissionsAndroid.RESULTS.GRANTED ||
+          notificationPermission !== RESULTS.GRANTED
+        ) {
+          Alert.alert(
+            'Permissions Required',
+            'You need to grant all permissions for the app to work properly.',
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     try {
