@@ -10,9 +10,9 @@ import {
   Modal,
   BackHandler,
   AppState,
-  StatusBar,
   PermissionsAndroid,
   FlatList,
+  StatusBar,
   Platform,
 } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
@@ -32,7 +32,6 @@ const Sms = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isTaskRunning, setIsTaskRunning] = useState(false);
   const [lastProcessedSmsId, setLastProcessedSmsId] = useState(null);
-  const [countdown, setCountdown] = useState(20);
   const [scamMessages, setScamMessages] = useState([]);
 
   useEffect(() => {
@@ -44,27 +43,14 @@ const Sms = () => {
       'hardwareBackPress',
       onBackPress,
     );
-    const appStateSubscription = AppState.addEventListener(
-      'change',
-      handleAppStateChange,
-    );
-
-    let timer;
-    if (isTaskRunning && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown(prevCount => prevCount - 1);
-      }, 1000);
-    } else if (countdown === 0) {
-      readLatestSMS();
-      setCountdown(20);
-    }
 
     return () => {
       backHandler.remove();
-      appStateSubscription.remove();
-      clearInterval(timer);
+      if (isTaskRunning) {
+        stopTask();
+      }
     };
-  }, [isTaskRunning, countdown]);
+  }, []);
 
   const setupNotifications = () => {
     PushNotification.configure({
@@ -118,12 +104,6 @@ const Sms = () => {
     return false;
   };
 
-  const handleAppStateChange = nextAppState => {
-    if (nextAppState === 'background' && isTaskRunning) {
-      console.log('App is in background, background task continues running');
-    }
-  };
-
   const requestReadSmsPermission = async () => {
     try {
       const granted = await PermissionsAndroid.request(
@@ -146,7 +126,7 @@ const Sms = () => {
     }
   };
 
-  const readLatestSMS = () => {
+  const readLatestSMS = async () => {
     SmsAndroid.list(
       JSON.stringify({
         box: 'inbox',
@@ -156,18 +136,21 @@ const Sms = () => {
       fail => {
         console.log('Failed with this error: ' + fail);
       },
-      (count, smsList) => {
+      async (count, smsList) => {
         const messages = JSON.parse(smsList);
         if (messages.length > 0) {
           const latestMessage = messages[0].body;
           const sender = messages[0].address;
           const messageId = messages[0]._id;
 
+          // Only proceed if the message ID is new
           if (messageId !== lastProcessedSmsId) {
             setLastProcessedSmsId(messageId);
             setLatestSms(latestMessage);
             setSmsSender(sender);
-            sendMessageToApi({message: latestMessage, sender});
+            await sendMessageToApi({message: latestMessage, sender});
+            // Store message ID to avoid re-processing
+            await AsyncStorage.setItem('lastProcessedSmsId', messageId);
           }
         }
       },
@@ -307,38 +290,40 @@ const Sms = () => {
     }
   };
 
-  const veryIntensiveTask = async taskDataArguments => {
-    const {delay} = taskDataArguments;
-    await new Promise(async resolve => {
-      for (let i = 0; BackgroundService.isRunning(); i++) {
-        await readLatestSMS();
-        await sleep(delay);
-      }
-    });
+  const veryIntensiveTask = async () => {
+    const options = {
+      taskName: 'SMS Scanner',
+      taskTitle: 'SMS Scanner',
+      taskDesc: 'Scanning for spam SMS...',
+      taskIcon: {
+        name: 'ic_launcher',
+        type: 'mipmap',
+      },
+      color: '#ff00ff',
+      parameters: {
+        delay: 180000, // Check every 60 seconds
+      },
+    };
+    await BackgroundService.start(async taskDataArguments => {
+      const {delay} = taskDataArguments;
+
+      await new Promise(async resolve => {
+        while (BackgroundService.isRunning()) {
+          readLatestSMS(); // Read latest SMS
+          await sleep(delay);
+        }
+        resolve();
+      });
+    }, options);
   };
 
   const sleep = time =>
     new Promise(resolve => setTimeout(() => resolve(), time));
 
-  const options = {
-    taskName: 'SMS Scanner',
-    taskTitle: 'SMS Scanner',
-    taskDesc: 'Scanning for spam SMS...',
-    taskIcon: {
-      name: 'ic_launcher',
-      type: 'mipmap',
-    },
-    color: '#ff00ff',
-    linkingURI: 'yourSchemeHere://chat/jane',
-    parameters: {
-      delay: 60000,
-    },
-  };
-
   const startTask = async () => {
     if (!isTaskRunning) {
       setIsTaskRunning(true);
-      await BackgroundService.start(veryIntensiveTask, options);
+      await veryIntensiveTask();
       showPersistentNotification();
     }
   };
