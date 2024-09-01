@@ -20,11 +20,11 @@ import {
   Dimensions,
 } from 'react-native';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
-import {supabase} from './supabase';
+import {supabase} from '../supabase';
 import BackgroundService from 'react-native-background-actions';
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {AuthContext} from './AuthContext';
+import {AuthContext} from '../AuthContext';
 import {FlatList} from 'react-native-gesture-handler';
 
 const {width, height} = Dimensions.get('window');
@@ -456,42 +456,53 @@ const Gmail1 = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <Text style={styles.headerText}>Gmail Scam Detection</Text>
+    <SafeAreaView className="flex-1 bg-black">
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <Text className="text-2xl font-bold text-white text-center mb-4 mt-5">
+        Gmail Scam Detection
+      </Text>
 
       {userInfo ? (
-        <View style={styles.signOutButton}>
-          <TouchableOpacity onPress={signOut}>
-            <Text style={styles.buttonText}>Sign Out</Text>
+        <View className="mb-4 ">
+          <TouchableOpacity
+            onPress={signOut}
+            className="bg-red-600 p-3 rounded-lg mx-5">
+            <Text className="text-white text-center text-lg ">Sign Out</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.signInButton}>
-          <TouchableOpacity onPress={signIn}>
-            <Text style={styles.buttonText}>Sign In with Google</Text>
+        <View className="mb-4">
+          <TouchableOpacity
+            onPress={signIn}
+            className="bg-blue-500 p-3 rounded-lg mx-5">
+            <Text className="text-white text-center text-lg">
+              Sign In with Google
+            </Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <View style={styles.fetchButtonContainer}>
+      <View className="mb-4">
         <TouchableOpacity
-          style={styles.fetchButton}
+          style={{backgroundColor: isLoading ? '#ddff00' : '#ddff00'}}
+          className="p-3 rounded-lg mx-5  "
           onPress={fetchLatestEmail}
           disabled={isLoading}>
-          <Text style={styles.buttonText}>
+          <Text className="text-black text-center text-lg">
             {isLoading ? 'Fetching...' : 'Fetch Latest Email'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerText}>Next Fetch in: {timer} seconds</Text>
+      <View className="mb-4">
+        <Text className="text-lg text-gray-400 text-center">
+          Next Fetch in: {timer} seconds
+        </Text>
       </View>
 
       {scammerStatus.isScammer && (
-        <View style={styles.scammerStatus}>
-          <Text style={styles.scammerText}>
+        <View className="bg-red-900 p-4 mb-4 rounded-lg">
+          <Text className="text-red-400 text-center text-lg">
             This email is classified as a scam. (Confidence: {confidence}%)
           </Text>
         </View>
@@ -504,23 +515,27 @@ const Gmail1 = () => {
           item.id ? item.id.toString() : index.toString()
         } // Use item.id or fallback to index
         renderItem={({item}) => (
-          <View style={styles.emailItem}>
-            <Text style={styles.emailSender}>{item.sender}</Text>
-            <Text style={styles.emailSubject}>{item.scam_head}</Text>
-            <Text style={styles.emailBody}>{item.scam_body}</Text>
+          <View className="bg-gray-800 p-4 mb-2 rounded-lg border border-gray-600">
+            <Text className="text-lg font-semibold text-white">
+              Sender: {item.sender}
+            </Text>
+            <Text className="text-md text-gray-300">
+              Subject: {item.scam_head}
+            </Text>
+            <Text className="text-sm text-gray-400">{item.scam_body}</Text>
             <TouchableOpacity
-              style={styles.deleteButton}
+              className="mt-2 bg-red-600 p-2 rounded-lg"
               onPress={() => deleteScamEmail(item.id)}>
-              <Text style={styles.buttonText}>Delete</Text>
+              <Text className="text-white text-center">Delete</Text>
             </TouchableOpacity>
           </View>
         )}
       />
 
       <TouchableOpacity
-        style={styles.modalButton}
+        className="bg-blue-500 p-3 rounded-lg mb-4"
         onPress={() => setModalVisible(true)}>
-        <Text style={styles.buttonText}>Show Scam Emails</Text>
+        <Text className="text-white text-center text-lg">Show Scam Emails</Text>
       </TouchableOpacity>
 
       <Modal
@@ -528,171 +543,59 @@ const Gmail1 = () => {
         transparent={true}
         animationType="slide"
         onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <FlatList
-            data={scamEmails}
-            keyExtractor={item => item.id.toString()} // Ensure the 'sid' is unique for each item
-            renderItem={({item}) => (
-              <View style={styles.scamItem}>
-                <Text style={styles.scamSubject}>{item.scam_subject}</Text>
-                <Text style={styles.scamBody}>{item.scam_body}</Text>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => deleteScamEmail(item.id)} // Pass the unique identifier here
-                >
-                  <Text style={styles.buttonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            ListEmptyComponent={<Text>No scam emails detected.</Text>}
-          />
-          <TouchableOpacity
-            style={styles.closeModalButton}
-            onPress={() => setModalVisible(false)}>
-            <Text style={styles.buttonText}>Close</Text>
-          </TouchableOpacity>
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-70">
+          <View className="bg-gray-900 p-6 rounded-lg">
+            <FlatList
+              data={scamEmails}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({item}) => (
+                <View className="bg-gray-800 p-4 mb-2 rounded-lg border border-gray-600">
+                  <Text className="text-lg font-semibold text-white">
+                    {item.scam_subject}
+                  </Text>
+                  <Text className="text-sm text-gray-400">
+                    {item.scam_body}
+                  </Text>
+                  <TouchableOpacity
+                    className="mt-2 bg-red-600 p-2 rounded-lg"
+                    onPress={() => deleteScamEmail(item.id)}>
+                    <Text className="text-white text-center">Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text className="text-center text-gray-400">
+                  No scam emails detected.
+                </Text>
+              }
+            />
+            <TouchableOpacity
+              className="bg-blue-500 p-2 rounded-lg mt-4"
+              onPress={() => setModalVisible(false)}>
+              <Text className="text-white text-center">Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
-      <View style={styles.taskButtons}>
+      <View className="flex-row justify-around mt-4">
         <TouchableOpacity
-          style={styles.taskButton}
+          className="bg-[#ddff00] p-3 rounded-lg flex-1 mr-2"
           onPress={handleStartButtonPress}>
-          <Text style={styles.buttonText}>Start Background Task</Text>
+          <Text className="text-white text-center text-lg text-black">
+            Start Background Task
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.taskButton}
+          className="bg-red-600 p-3 rounded-lg flex-1 ml-2"
           onPress={handleStopButtonPress}>
-          <Text style={styles.buttonText}>Stop Background Task</Text>
+          <Text className="text-white text-center text-lg">
+            Stop Background Task
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  scrollContainer: {
-    padding: 16,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  signInButton: {
-    backgroundColor: '#4285F4',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  signOutButton: {
-    backgroundColor: '#DB4437',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  fetchButtonContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  fetchButton: {
-    backgroundColor: '#34A853',
-    padding: 15,
-    borderRadius: 5,
-  },
-  timerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  timerText: {
-    fontSize: 16,
-  },
-  scammerStatus: {
-    backgroundColor: '#FDD835',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  scammerText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  scamList: {
-    marginBottom: 20,
-  },
-  scamItem: {
-    backgroundColor: '#F9F9F9',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  scamSubject: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  scamBody: {
-    color: '#333',
-  },
-  deleteButton: {
-    backgroundColor: '#D32F2F',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  modalButton: {
-    backgroundColor: '#FF5722',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalEmail: {
-    backgroundColor: '#F5F5F5',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  modalSubject: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  modalBody: {
-    color: '#333',
-  },
-  closeModalButton: {
-    backgroundColor: '#1976D2',
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  taskButtons: {
-    marginTop: 20,
-  },
-  taskButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-});
 
 export default Gmail1;

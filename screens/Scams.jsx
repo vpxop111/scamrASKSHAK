@@ -1,7 +1,8 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, FlatList, StyleSheet, Button} from 'react-native';
+import {View, Text, FlatList, Button} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {supabase} from '../supabase'; // Adjust the import path if necessary
+import {TouchableOpacity} from 'react-native-gesture-handler';
 
 export default function Scams() {
   const [scams, setScams] = useState([]);
@@ -37,7 +38,7 @@ export default function Scams() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center">
         <Text>Loading...</Text>
       </View>
     );
@@ -45,59 +46,35 @@ export default function Scams() {
 
   if (scams.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text>No scams found</Text>
+      <View className="flex-1 justify-center items-center bg-[#0D0E10]">
+        <Text className="text-white">No scams found</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Scam List</Text>
+    <View className="flex-1 p-5 bg-[#0D0E10]">
+      <Text className="text-2xl font-bold mb-5 text-white">Scam List</Text>
       <FlatList
         data={scams}
         keyExtractor={item => item.id.toString()}
         renderItem={({item}) => (
-          <View style={styles.item}>
-            <Button
-              style={styles.itemText}
-              title={item.scam_type}
+          <View className="py-4 border-b border-gray-300">
+            <TouchableOpacity
+              className="bg-[#ddff00] p-5 rounded-lg"
               onPress={() =>
                 navigation.navigate('mscam', {
                   stype: item.scam_type,
                   s_id: item.id,
                 })
-              }
-            />
+              }>
+              <Text className="text-black text-xl font-bold">
+                {item.scam_type}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  item: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  itemText: {
-    fontSize: 18,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

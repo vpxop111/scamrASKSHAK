@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, ScrollView} from 'react-native';
 import {supabase} from '../supabase'; // Adjust the import path if necessary
 
 const Indian_law = ({route}) => {
@@ -34,23 +34,27 @@ const Indian_law = ({route}) => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <Text>Loading...</Text>
+      <View className="flex-1 justify-center items-center bg-[#0D0E10]">
+        <Text className="text-white">Loading...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Details for {stype1}</Text>
+    <View className="flex-1 p-5 bg-[#0D0E10]">
+      <Text className="text-2xl font-bold mb-5 text-white">
+        Details for {stype1}
+      </Text>
       <ScrollView>
         {solutions.length > 0 ? (
           <View>
             {solutions.map((solu, index) => (
-              <View key={index} style={styles.solutionContainer}>
-                <Text style={styles.scamName}>Scam Name: {solu.scam_name}</Text>
-                <Text style={styles.solution}>
-                  Indain_law: {solu.Indian_law}
+              <View key={index} className="mb-5 text-white">
+                <Text className="text-lg mb-2 text-white">
+                  Scam Name: {solu.scam_name}
+                </Text>
+                <Text className="text-base text-white">
+                  Indian Law: {solu.Indian_law}
                 </Text>
               </View>
             ))}
@@ -62,34 +66,5 @@ const Indian_law = ({route}) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  scamName: {
-    fontSize: 18,
-    marginBottom: 10,
-  },
-  solution: {
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  solutionContainer: {
-    marginBottom: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default Indian_law;

@@ -79,43 +79,24 @@ export default function Login({navigation}) {
 
   if (isSigninInProgress) {
     return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+      <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
   }
 
   return (
-    <View style={{backgroundColor: 'black', height: '100%'}}>
-      <View style={{marginTop: 80, marginLeft: 32}}>
-        <Text style={{fontSize: 40, fontWeight: 'bold', color: '#ddff00'}}>
-          Welcome
-        </Text>
-        <View style={{flexDirection: 'row', marginTop: 8}}>
-          <Text style={{fontSize: 40, fontWeight: 'bold', color: 'white'}}>
-            Back
-          </Text>
-          <Text style={{fontSize: 40, fontWeight: 'bold', color: '#ddff00'}}>
-            !
-          </Text>
+    <View className="bg-black h-full">
+      <View className="mt-20 ml-8">
+        <Text className="text-5xl font-bold text-[#ddff00]">Welcome</Text>
+        <View className="flex-row mt-2">
+          <Text className="text-5xl font-bold text-white">Back</Text>
+          <Text className="text-5xl font-bold text-[#ddff00]">!</Text>
         </View>
         <TouchableOpacity
-          style={{
-            padding: 16,
-            borderRadius: 50,
-            shadowColor: 'black',
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-            shadowOffset: {width: 0, height: 2},
-            backgroundColor: '#ddff00',
-            width: 240,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: 40,
-          }}
-          activeOpacity={0.7}
+          className="mt-10 p-4 rounded-full bg-[#ddff00] w-60 shadow-md shadow-black items-center justify-center active:opacity-70"
           onPress={handleGoogleSignIn}>
-          <Text style={{color: 'black', fontSize: 24, fontWeight: 'bold'}}>
+          <Text className="text-black text-2xl font-bold">
             Login with Google
           </Text>
         </TouchableOpacity>

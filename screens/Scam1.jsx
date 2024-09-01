@@ -1,7 +1,6 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text} from 'react-native';
 import {supabase} from '../supabase'; // Adjust the import path if necessary
-
 const Scam1 = ({route}) => {
   const {stype1} = route.params;
   const [scams, setScams] = useState([]);
@@ -37,19 +36,23 @@ const Scam1 = ({route}) => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <Text>Loading...</Text>
+      <View className="flex-1 justify-center items-center bg-[#0D0E10]">
+        <Text className="bg-white">Loading...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Scam List for {stype1}</Text>
+    <View className="flex-1 p-5 bg-[#0D0E10] text-white">
+      <Text className="text-2xl font-bold mb-5 text-white">
+        Scam List for {stype1}
+      </Text>
       {scams.length > 0 ? (
         <View>
           {scams.map(scam => (
-            <Text key={scam.id}>{scam.scam_name}</Text>
+            <Text key={scam.id} className="text-white">
+              {scam.scam_name}
+            </Text>
           ))}
         </View>
       ) : (
@@ -58,23 +61,5 @@ const Scam1 = ({route}) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default Scam1;

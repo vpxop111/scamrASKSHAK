@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import {supabase} from '../supabase';
-import Gmail1 from '../Gmail1';
+import Gmail1 from './Gmail1';
 
 export default function Welcome({navigation}) {
   const [loginEmail, setLoginEmail] = useState('');

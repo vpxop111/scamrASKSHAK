@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,9 @@ import {
   Button,
   FlatList,
   ActivityIndicator,
-  StyleSheet,
 } from 'react-native';
 import axios from 'axios'; // Import axios for making HTTP requests
+import {TouchableOpacity} from 'react-native-gesture-handler';
 
 const Scamai = () => {
   const [loading, setLoading] = useState(false);
@@ -55,72 +55,42 @@ const Scamai = () => {
   };
 
   const renderItem = ({item}) => (
-    <View style={styles.messageContainer}>
+    <View className="my-2">
       <Text
-        style={item.role === 'user' ? styles.userMessage : styles.aiMessage}>
+        className={`${
+          item.role === 'user'
+            ? 'self-end bg-[#ddff00]'
+            : 'self-start bg-gray-200'
+        } p-2 rounded-lg`}>
         {item.content}
       </Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 p-5 bg-black">
       <FlatList
         data={chatHistory}
         renderItem={renderItem}
         keyExtractor={(item, index) => index.toString()}
-        style={styles.chatList}
+        className="flex-1"
       />
       {loading && <ActivityIndicator size="large" color="#0000ff" />}
-      <View style={styles.inputContainer}>
+      <View className="flex-row items-center mt-4">
         <TextInput
-          style={styles.input}
+          className="flex-1 border-2 text-white border-[#ddff00] rounded-lg p-2 mr-2"
           value={input}
           onChangeText={setInput}
           placeholder="Type a message..."
         />
-        <Button title="Send" onPress={handleSend} />
+        <TouchableOpacity
+          onPress={handleSend}
+          className="bg-[#ddff00] rounded-xl p-3">
+          <Text className=" text-blakc p rounded-lg font-bold">Send</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: 'white',
-  },
-  chatList: {
-    flex: 1,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 10,
-    marginRight: 10,
-  },
-  messageContainer: {
-    marginVertical: 5,
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#DCF8C6',
-    padding: 10,
-    borderRadius: 5,
-  },
-  aiMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E5E5EA',
-    padding: 10,
-    borderRadius: 5,
-  },
-});
 
 export default Scamai;

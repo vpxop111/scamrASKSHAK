@@ -4,7 +4,7 @@ import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import Home from './Home'; // Import your Home component
 import ScamList from './ScamList'; // Import the Scam List component
-import SMS from './SMS'; // Import the SMS component
+import SMS from './screens/Sms'; // Import the SMS component
 import PhoneCall from './PhoneCall'; // Import the Phone Call component
 import Gmail from './Gmail'; // Import the Gmail component
 import ScamNews from './ScamNews'; // Import the Scam News component

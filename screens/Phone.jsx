@@ -227,19 +227,16 @@ const Phone = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Scam Call Detection</Text>
+    <SafeAreaView className="flex flex-col bg-black min-h-full items-center">
+      <StatusBar className="" />
+      <View className="mt-40">
+        <Text className="text-3xl text-white mb-20">Scam Call Detection</Text>
       </View>
-      <View style={styles.content}>
+      <View className="">
         <TouchableOpacity
-          style={[
-            styles.button,
-            isTaskRunning ? styles.buttonStop : styles.buttonStart,
-          ]}
+          className="isTaskRunning ? mx-5 h-12 w-60  bg-blue-800 text-white : bg-[#ddff00] text-black,"
           onPress={isTaskRunning ? onStopTaskPress : onStartTaskPress}>
-          <Text style={styles.buttonText}>
+          <Text className="text-xl text-center mt-2 font-bold">
             {isTaskRunning ? 'Stop Detection' : 'Start Detection'}
           </Text>
         </TouchableOpacity>
@@ -247,41 +244,5 @@ const Phone = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  header: {
-    padding: 16,
-    backgroundColor: '#f8f8f8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  content: {
-    padding: 16,
-  },
-  button: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  buttonStart: {
-    backgroundColor: '#007bff',
-  },
-  buttonStop: {
-    backgroundColor: '#ff4d4d',
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});
 
 export default Phone;

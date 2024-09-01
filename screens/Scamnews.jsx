@@ -5,7 +5,6 @@ import {
   FlatList,
   ActivityIndicator,
   Image,
-  StyleSheet,
   TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
@@ -42,29 +41,34 @@ const Scamnews = ({navigation}) => {
 
   if (loading) {
     return (
-      <View style={styles.loader}>
+      <View className="flex-1 justify-center items-center bg-gray-100">
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 p-5 bg-black">
       <FlatList
         data={news}
         keyExtractor={item => item.url}
         renderItem={({item}) => (
           <TouchableOpacity
-            style={styles.newsItem}
+            className="flex-row mb-5 p-4 bg-white rounded-lg shadow-md"
             onPress={() =>
               navigation.navigate('SpecificNews', {article: item})
             }>
             {item.image && (
-              <Image source={{uri: item.image}} style={styles.thumbnail} />
+              <Image
+                source={{uri: item.image}}
+                className="w-24 h-24 rounded-lg mr-4"
+              />
             )}
-            <View style={styles.textContainer}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.description}>{item.description}</Text>
+            <View className="flex-1">
+              <Text className="text-lg font-bold mb-2">{item.title}</Text>
+              <Text className="text-base text-gray-600">
+                {item.description}
+              </Text>
             </View>
           </TouchableOpacity>
         )}
@@ -72,48 +76,5 @@ const Scamnews = ({navigation}) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f0f0f0',
-  },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  newsItem: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  thumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-    marginRight: 15,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  description: {
-    fontSize: 16,
-    color: '#666',
-  },
-});
 
 export default Scamnews;

@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useContext} from 'react';
+import React, {useEffect, useContext} from 'react';
 import {Text, View, TouchableOpacity} from 'react-native';
 import {AuthContext} from '../AuthContext'; // Import AuthContext
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -30,16 +30,18 @@ export default function Home() {
   };
 
   return (
-    <View className="flex flex-col h-full bg-black">
-      <ScrollView>
-        <View className="flex flex-col mt-5  bg-black ml-2">
-          <View className="flex flex-row mx-5">
+    <View className="flex-1 relative">
+      {/* Animated Gradient Background */}
+
+      <ScrollView className="flex-1 bg-[#0D0E10]">
+        <View className="flex flex-col mt-5 bg-transparent ml-2">
+          <View className="flex flex-row mx-5 items-center">
             <View className="flex flex-row mt-2">
               <Text className="text-[#ddff00] text-2xl font-bold">S</Text>
               <Text className="text-2xl font-bold text-white">camRakshak</Text>
             </View>
             <TouchableOpacity
-              className="bg-[#ddff00] text-black h-12 pr-5  ml-20 rounded-full"
+              className="bg-[#ddff00] text-black h-12 pr-5 ml-10 rounded-full"
               onPress={handleLogout}>
               <Text className="ml-4 mt-2 text-xl text-black font-semibold">
                 Logout
@@ -47,7 +49,7 @@ export default function Home() {
             </TouchableOpacity>
           </View>
         </View>
-        <View className="pt-5 pb-6 bg-[#404040] mx-5 mt-10 rounded-2xl flex flex-col">
+        <View className="pt-5 pb-6 bg-[#2C2C29] mx-5 mt-10 rounded-2xl flex flex-col">
           <View className="flex flex-row ml-3 mb-3">
             <Text className="text-[#ddff00] text-2xl font-bold">Good</Text>
             <Text className="text-white text-2xl font-bold ml-1">Morning</Text>
@@ -59,21 +61,20 @@ export default function Home() {
             </Text>
           </View>
         </View>
-        <View className="h-12 w-full mx-5 border border-white mt-8 flex flex-row">
+        <View className="h-12  mx-5 border bg-[#2C2C29] border-[#2C2C29] mt-8  flex flex-row rounded-xl">
           <Text className="text-[#FFB200] text-xl font-semibold ml-8 mt-2">
             Likely
           </Text>
           <Text className="text-white text-xl font-semibold ml-2 mt-2">23</Text>
-          <Text className="text-red-500 text-xl font-semibold ml-20 pl-10 mt-2">
+          <Text className="text-red-500 text-xl font-semibold ml-14  mt-2">
             Scam
           </Text>
           <Text className="text-white text-xl font-semibold ml-4 mt-2">2</Text>
         </View>
         <View className="mx-5 flex flex-col mt-8">
-          <Text className="text-white text-xl font-bold">Features</Text>
-
+          <Text className="text-white text-xl font-medium">Features</Text>
           <TouchableOpacity
-            className="bg-[#929292] h-20 w-full mt-5"
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
             onPress={() => {
               navigation.navigate('scam');
             }}>
@@ -83,7 +84,7 @@ export default function Home() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            className="bg-[#929292] h-20 w-full mt-5"
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
             onPress={() => {
               navigation.navigate('sms');
             }}>
@@ -91,9 +92,8 @@ export default function Home() {
               SMS
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            className="bg-[#929292] h-20 w-full mt-5"
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
             onPress={() => {
               navigation.navigate('phone');
             }}>
@@ -101,9 +101,8 @@ export default function Home() {
               Phone Call
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            className="bg-[#929292] h-20 w-full mt-5"
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
             onPress={() => {
               navigation.navigate('gmail');
             }}>
@@ -112,7 +111,7 @@ export default function Home() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className="bg-[#929292] h-20 w-full mt-5"
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
             onPress={() => {
               navigation.navigate('news');
             }}>
@@ -121,7 +120,7 @@ export default function Home() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className="bg-[#929292] h-20 w-full mt-5"
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl mb-5"
             onPress={() => {
               navigation.navigate('ai');
             }}>
