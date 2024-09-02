@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import axios from 'axios'; // Import axios for making HTTP requests
 import {TouchableOpacity} from 'react-native-gesture-handler';
-
+import BottomNavigationBar from './BottomNavigation';
 const Scamai = () => {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
@@ -68,7 +68,7 @@ const Scamai = () => {
   );
 
   return (
-    <View className="flex-1 p-5 bg-black">
+    <View className="flex-1 p-5 bg-[#0D0E10]">
       <FlatList
         data={chatHistory}
         renderItem={renderItem}
@@ -89,6 +89,7 @@ const Scamai = () => {
           <Text className=" text-blakc p rounded-lg font-bold">Send</Text>
         </TouchableOpacity>
       </View>
+      <BottomNavigationBar />
     </View>
   );
 };

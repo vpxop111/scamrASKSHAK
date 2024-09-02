@@ -1,8 +1,8 @@
-import React, {useContext, useEffect, useState} from 'react';
+import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {TaskProvider} from './TaskContext'; // Import TaskProvider
-import {AuthProvider, AuthContext} from './AuthContext'; // Import AuthProvider and AuthContext
+import {AuthProvider} from './AuthContext'; // Import AuthProvider
 import Home from './screens/Home';
 import Welcome from './screens/Welcome';
 import Signup from './screens/Signup';
@@ -22,6 +22,7 @@ import Website from './screens/Website';
 import Phone from './screens/Phone';
 import SpecificNews from './screens/SpecificNews';
 import {BackgroundTaskProvider} from './BackgroundTaskContext';
+
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -30,7 +31,10 @@ const App = () => {
       <BackgroundTaskProvider>
         <TaskProvider>
           <NavigationContainer>
-            <Stack.Navigator initialRouteName="Login">
+            <Stack.Navigator
+              initialRouteName="Login"
+              screenOptions={{headerShown: true}} // This will show headers for all screens by default
+            >
               <Stack.Screen
                 name="Welcome"
                 component={Welcome}
@@ -45,6 +49,7 @@ const App = () => {
                 name="Login"
                 component={Login}
                 initialParams={{paramName: 'navigation'}}
+                options={{headerShown: false}}
               />
               <Stack.Screen
                 name="Home"
@@ -65,14 +70,22 @@ const App = () => {
                 initialParams={{paramName: 'navigation'}}
               />
               <Stack.Screen name="mscam" component={Mainscam} />
-              <Stack.Screen name="news" component={Scamnews} />
+              <Stack.Screen
+                name="news"
+                component={Scamnews}
+                initialParams={{paramName: 'navigation'}}
+              />
               <Stack.Screen name="scamlist" component={Scam1} />
               <Stack.Screen name="solution" component={Solution} />
               <Stack.Screen name="i_law" component={Indian_law} />
               <Stack.Screen name="u_law" component={UsaLaw} />
               <Stack.Screen name="resource" component={Resource} />
               <Stack.Screen name="SpecificNews" component={SpecificNews} />
-              <Stack.Screen name="ai" component={Scamai} />
+              <Stack.Screen
+                name="ai"
+                component={Scamai}
+                initialParams={{paramName: 'navigation'}}
+              />
             </Stack.Navigator>
           </NavigationContainer>
         </TaskProvider>

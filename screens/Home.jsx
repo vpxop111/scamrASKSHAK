@@ -3,6 +3,7 @@ import {Text, View, TouchableOpacity} from 'react-native';
 import {AuthContext} from '../AuthContext'; // Import AuthContext
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {ScrollView} from 'react-native-gesture-handler';
+import BottomNavigationBar from './BottomNavigation';
 
 export default function Home() {
   const {user, signOut} = useContext(AuthContext); // Use AuthContext to get user and signOut
@@ -76,16 +77,6 @@ export default function Home() {
           <TouchableOpacity
             className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
             onPress={() => {
-              navigation.navigate('scam');
-            }}>
-            <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
-              Scams List
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
-            onPress={() => {
               navigation.navigate('sms');
             }}>
             <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
@@ -110,26 +101,9 @@ export default function Home() {
               Gmail
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
-            onPress={() => {
-              navigation.navigate('news');
-            }}>
-            <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
-              Scam News
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl mb-5"
-            onPress={() => {
-              navigation.navigate('ai');
-            }}>
-            <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
-              Scam AI
-            </Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
+      <BottomNavigationBar />
     </View>
   );
 }

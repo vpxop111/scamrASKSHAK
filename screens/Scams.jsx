@@ -3,7 +3,7 @@ import {View, Text, FlatList, Button} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {supabase} from '../supabase'; // Adjust the import path if necessary
 import {TouchableOpacity} from 'react-native-gesture-handler';
-
+import BottomNavigationBar from './BottomNavigation';
 export default function Scams() {
   const [scams, setScams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +75,7 @@ export default function Scams() {
           </View>
         )}
       />
+      <BottomNavigationBar />
     </View>
   );
 }

@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
-
+import BottomNavigationBar from './BottomNavigation';
 // Replace with your GNews API key
 const GNEWS_API_KEY = '4e7471e098930c7d98dc3495a9752490';
 
@@ -43,12 +43,13 @@ const Scamnews = ({navigation}) => {
     return (
       <View className="flex-1 justify-center items-center bg-gray-100">
         <ActivityIndicator size="large" color="#0000ff" />
+        <BottomNavigationBar />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 p-5 bg-black">
+    <View className="flex-1 p-5 bg-[#0D0E10]">
       <FlatList
         data={news}
         keyExtractor={item => item.url}
@@ -73,6 +74,7 @@ const Scamnews = ({navigation}) => {
           </TouchableOpacity>
         )}
       />
+      <BottomNavigationBar />
     </View>
   );
 };
