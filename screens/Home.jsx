@@ -101,6 +101,15 @@ export default function Home() {
               Gmail
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
+            onPress={() => {
+              navigation.navigate('websitedetection');
+            }}>
+            <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
+              Website
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
       <BottomNavigationBar />

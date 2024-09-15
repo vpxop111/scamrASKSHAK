@@ -46,7 +46,7 @@
     "react-native-callkeep": "^4.3.14",
     "react-native-feather": "^1.1.2",
     "react-native-fs": "^2.20.0",
-    "react-native-gesture-handler": "^1.10.3",
+    "react-native-gesture-handler": "^2.19.0",
     "react-native-get-sms-android": "^2.1.0",
     "react-native-linear-gradient": "^2.8.3",
     "react-native-permissions": "^4.1.5",

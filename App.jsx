@@ -22,6 +22,8 @@ import Website from './screens/Website';
 import Phone from './screens/Phone';
 import SpecificNews from './screens/SpecificNews';
 import {BackgroundTaskProvider} from './BackgroundTaskContext';
+import Websitedetection from './screens/Websitedetection';
+import BottomNavigation from './screens/BottomNavigation';
 
 const Stack = createStackNavigator();
 
@@ -39,6 +41,7 @@ const App = () => {
                 name="Welcome"
                 component={Welcome}
                 initialParams={{paramName: 'navigation'}}
+                
               />
               <Stack.Screen
                 name="Signup"
@@ -55,11 +58,13 @@ const App = () => {
                 name="Home"
                 component={Home}
                 initialParams={{paramName: 'navigation'}}
+                options={{headerShown: false}}
               />
               <Stack.Screen
                 name="scams"
                 component={Scams}
                 initialParams={{paramName: 'navigation'}}
+                options={{headerShown: false}}
               />
               <Stack.Screen name="gmail" component={Gmail1} />
               <Stack.Screen name="phone" component={Phone} />
@@ -68,11 +73,18 @@ const App = () => {
                 name="scam"
                 component={Scams}
                 initialParams={{paramName: 'navigation'}}
+                options={{headerShown: false}}
               />
               <Stack.Screen name="mscam" component={Mainscam} />
               <Stack.Screen
                 name="news"
                 component={Scamnews}
+                initialParams={{paramName: 'navigation'}}
+                options={{headerShown: false}}
+              />
+              <Stack.Screen
+                name="bottom"
+                component={BottomNavigation}
                 initialParams={{paramName: 'navigation'}}
               />
               <Stack.Screen name="scamlist" component={Scam1} />
@@ -85,7 +97,9 @@ const App = () => {
                 name="ai"
                 component={Scamai}
                 initialParams={{paramName: 'navigation'}}
+                options={{headerShown: false}}
               />
+              <Stack.Screen name="websitedetection" component={Websitedetection} />
             </Stack.Navigator>
           </NavigationContainer>
         </TaskProvider>

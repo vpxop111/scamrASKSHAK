@@ -55,6 +55,7 @@ export const AuthProvider = ({children}) => {
       const userInfo = await GoogleSignin.signIn();
       setUser(userInfo.user);
     } catch (error) {
+      console.error('Sign-In Error:', error); // Log the full error object
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         Alert.alert('Sign-In Cancelled', 'User cancelled the sign-in process.');
       } else if (error.code === statusCodes.IN_PROGRESS) {
@@ -70,7 +71,6 @@ export const AuthProvider = ({children}) => {
           'An error occurred during sign-in. Please try again.',
         );
       }
-      console.error('Sign-In Error:', error.message);
     } finally {
       setIsSigninInProgress(false);
     }
