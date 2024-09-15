@@ -1,15 +1,16 @@
-import React, {useEffect, useContext} from 'react';
+import React, {useEffect, useContext, useState} from 'react';
 import {Text, View, TouchableOpacity} from 'react-native';
 import {AuthContext} from '../AuthContext'; // Import AuthContext
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {ScrollView} from 'react-native-gesture-handler';
 import BottomNavigationBar from './BottomNavigation';
+import ImageUpload from './ImageUpload'; // {{ edit_1 }}
 
 export default function Home() {
   const {user, signOut} = useContext(AuthContext); // Use AuthContext to get user and signOut
   const navigation = useNavigation();
   const route = useRoute();
-  const {paramName} = route.params || {}; // Handle cases where params might be undefined
+  const {paramName} = route.params || {}; // Handle cases where params might be undefine
 
   useEffect(() => {
     if (user) {
@@ -32,7 +33,6 @@ export default function Home() {
 
   return (
     <View className="flex-1 relative">
-      {/* Animated Gradient Background */}
 
       <ScrollView className="flex-1 bg-[#0D0E10]">
         <View className="flex flex-col mt-5 bg-transparent ml-2">
@@ -111,8 +111,17 @@ export default function Home() {
             </Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
+          onPress={() => navigation.navigate('ImageUpload')} 
+        >
+          <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
+            Go to Image Upload
+          </Text>
+        </TouchableOpacity>
+        <ImageUpload /> 
+        <BottomNavigationBar />
       </ScrollView>
-      <BottomNavigationBar />
     </View>
   );
 }

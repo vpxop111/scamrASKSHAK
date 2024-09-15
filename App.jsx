@@ -24,6 +24,7 @@ import SpecificNews from './screens/SpecificNews';
 import {BackgroundTaskProvider} from './BackgroundTaskContext';
 import Websitedetection from './screens/Websitedetection';
 import BottomNavigation from './screens/BottomNavigation';
+import ImageUpload from './screens/ImageUpload';
 
 const Stack = createStackNavigator();
 
@@ -100,6 +101,7 @@ const App = () => {
                 options={{headerShown: false}}
               />
               <Stack.Screen name="websitedetection" component={Websitedetection} />
+              <Stack.Screen name="ImageUpload" component={ImageUpload} />
             </Stack.Navigator>
           </NavigationContainer>
         </TaskProvider>
