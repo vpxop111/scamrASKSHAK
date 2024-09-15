@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, Button, Image, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, Button, Image, Alert, ActivityIndicator, TouchableOpacity, ScrollView, TouchableWithoutFeedback } from 'react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 
@@ -7,6 +7,7 @@ export default function App() {
   const [image, setImage] = useState(null);
   const [extractedText, setExtractedText] = useState([]);
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(); // Create a ref for the ScrollView
 
   const pickImageFromGallery = () => {
     launchImageLibrary(
@@ -53,7 +54,6 @@ export default function App() {
   const performOCR = async (file) => {
     const formData = new FormData();
 
-    // Log file info before sending
     console.log('Preparing image for OCR: ', file);
 
     formData.append('image', {
@@ -78,22 +78,20 @@ export default function App() {
 
       console.log('OCR API Response:', response.data); // Log entire response data from the API
 
-      // Check if data exists in the response
       if (response.data && Array.isArray(response.data)) {
         const textArray = response.data.map(item => item.text);
         console.log('Text Array:', textArray); // Log the array of text items
 
-        // Break the extracted text into sentences
         const sentences = textArray.join(' ').split(/(?<=[.!?])\s+/); // Split by punctuation followed by whitespace
         console.log('Extracted Sentences:', sentences); // Log the extracted sentences
         setExtractedText(sentences);
+        sendToScamAPI(sentences); // Send the sentences to the Scam API
       } else {
         console.log('No text found in response data');
         setExtractedText(['No text found']);
       }
 
     } catch (error) {
-      // Log error details
       console.error('Error performing OCR:', error);
       if (error.response) {
         console.error('Error response data:', error.response.data); // Log server response errors
@@ -104,48 +102,57 @@ export default function App() {
     }
   };
 
+  const sendToScamAPI = async (messages) => {
+    setLoading(true);
+    console.log('Sending messages to scam detection API:', messages);
+
+    try {
+      const response = await axios.post('https://varun324242-dds.hf.space/predict', {
+        messages: messages,
+      });
+
+      console.log('Scam Detection API Response:', response.data); // Log the response from the scam detection API
+
+      // Process and format the response
+      if (response.data && response.data.predictions) {
+        const formattedResult = response.data.predictions.map((prediction, index) => {
+          const messageStatus = prediction.scam_class;
+          const probability = (prediction.scam_probability * 100).toFixed(2);
+          return `Message ${index + 1}: ${messageStatus} (Probability: ${probability}%)\n"${prediction.message}"`;
+        }).join('\n\n');
+
+        console.log('Formatted Scam Detection Results:', formattedResult); // Log formatted results
+        Alert.alert('Scam Detection Results', formattedResult); // Show results in alert
+      } else {
+        Alert.alert('Error', 'Invalid response from scam detection API');
+      }
+
+    } catch (error) {
+      console.error('Error sending data to scam detection API:', error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data); // Log server response errors
+      }
+      Alert.alert('Error', 'Failed to analyze messages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Image to Text App</Text>
-      <Button title="Pick an Image from Gallery" onPress={pickImageFromGallery} />
-      <Button title="Capture Image from Camera" onPress={captureImageFromCamera} />
-      {image && <Image source={{ uri: image }} style={styles.image} />}
-      {loading && <ActivityIndicator size="large" color="#0000ff" />}
-      <Text style={styles.extractedTextTitle}>Extracted Text:</Text>
-      {extractedText.map((sentence, index) => (
-        <Text key={index} style={styles.extractedText}>{sentence}</Text>
-      ))}
-    </View>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="bg-black">
+      <View className="flex-1 justify-center items-center">
+        <Text className="text-3xl font-bold text-[#ddff00] mb-4 mt-10">Image to Text App</Text>
+        <TouchableOpacity onPress={pickImageFromGallery} className="bg-[#ddff00] p-5 text-center rounded-xl mt-5 mb-5">
+          <Text className="text-black text-xl font-bold">Pick an Image</Text>
+        </TouchableOpacity>
+        
+        {image && <Image source={{ uri: image }} className="w-72 h-72 resize-mode-contain my-2" />}
+        {loading && <ActivityIndicator size="large" color="#ddff00" />}
+        <Text className="text-xl font-bold text-[#ddff00] mt-5">Extracted Text:</Text>
+        {extractedText.map((sentence, index) => (
+          <Text key={index} className="text-base mt-2 text-white text-center">{sentence}</Text>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  image: {
-    width: 300,
-    height: 300,
-    resizeMode: 'contain',
-    marginVertical: 10,
-  },
-  extractedTextTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 20,
-  },
-  extractedText: {
-    fontSize: 16,
-    marginTop: 10,
-    color: 'black',
-    textAlign: 'center',
-  },
-});
