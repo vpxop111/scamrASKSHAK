@@ -25,7 +25,7 @@ import {BackgroundTaskProvider} from './BackgroundTaskContext';
 import Websitedetection from './screens/Websitedetection';
 import BottomNavigation from './screens/BottomNavigation';
 import ImageUpload from './screens/ImageUpload';
-
+import Databreachdetector from './screens/Databreachdetector';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -102,6 +102,7 @@ const App = () => {
               />
               <Stack.Screen name="websitedetection" component={Websitedetection} />
               <Stack.Screen name="ImageUpload" component={ImageUpload} />
+              <Stack.Screen name="databreachdetector" component={Databreachdetector} />
             </Stack.Navigator>
           </NavigationContainer>
         </TaskProvider>

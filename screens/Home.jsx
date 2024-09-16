@@ -117,6 +117,14 @@ export default function Home() {
                 Go to Image Upload
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl mb-5"
+              onPress={() => navigation.navigate('databreachdetector')} 
+            >
+              <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
+              Data Breach Detector
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
