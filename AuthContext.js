@@ -1,4 +1,3 @@
-// AuthContext.js
 import React, {createContext, useState, useEffect} from 'react';
 import {
   GoogleSignin,
@@ -9,7 +8,7 @@ import {Alert} from 'react-native';
 // Create the AuthContext
 export const AuthContext = createContext();
 
-export const AuthProvider = ({children}) => {
+const AuthProvider = ({children}) => {
   const [user, setUser] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
 
@@ -101,3 +100,5 @@ export const AuthProvider = ({children}) => {
     </AuthContext.Provider>
   );
 };
+
+export default AuthProvider;

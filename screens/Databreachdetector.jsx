@@ -38,29 +38,29 @@ const DataBreachChecker = () => {
   };
 
   return (
-    <View className="flex-1 justify-center items-center p-4 bg-gray-100">
-      <Text className="text-xl font-bold mb-6">Check Data Breach</Text>
+    <View className="flex-1 justify-center items-center p-4 bg-black">
+      <Text className="text-xl font-bold mb-6 text-[#ddff00]">Check Data Breach</Text>
       
       {/* Option to choose email or username */}
       <View className="flex-row mb-4">
         <TouchableOpacity
-          className={`px-4 py-2 rounded-full ${type === 'email' ? 'bg-blue-500' : 'bg-gray-300'}`}
+          className={`px-4 py-2 rounded-full ${type === 'email' ? 'bg-[#ddff00]' : 'bg-gray-700'}`}
           onPress={() => setType('email')}
         >
-          <Text className={`${type === 'email' ? 'text-white' : 'text-black'}`}>Email</Text>
+          <Text className={`${type === 'email' ? 'text-black' : 'text-[#ddff00]'}`}>Email</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          className={`px-4 py-2 ml-4 rounded-full ${type === 'username' ? 'bg-blue-500' : 'bg-gray-300'}`}
+          className={`px-4 py-2 ml-4 rounded-full ${type === 'username' ? 'bg-[#ddff00]' : 'bg-gray-700'}`}
           onPress={() => setType('username')}
         >
-          <Text className={`${type === 'username' ? 'text-white' : 'text-black'}`}>Username</Text>
+          <Text className={`${type === 'username' ? 'text-black' : 'text-[#ddff00]'}`}>Username</Text>
         </TouchableOpacity>
       </View>
 
       {/* Input field for email or username */}
       <TextInput
-        className="w-full p-3 bg-white rounded-lg mb-4 border border-gray-300"
+        className="w-full p-3 bg-gray-800 text-[#ddff00] rounded-lg mb-4 border border-gray-600"
         placeholder={type === 'email' ? 'Enter Email' : 'Enter Username'}
         value={input}
         onChangeText={setInput}
@@ -69,10 +69,10 @@ const DataBreachChecker = () => {
 
       {/* Submit button */}
       <TouchableOpacity
-        className="w-full p-3 bg-blue-500 rounded-lg"
+        className="w-full p-3 bg-[#ddff00] rounded-lg"
         onPress={handleCheck}
       >
-        <Text className="text-center text-white font-bold">Check Data Breach</Text>
+        <Text className="text-center text-black font-bold">Check Data Breach</Text>
       </TouchableOpacity>
     </View>
   );

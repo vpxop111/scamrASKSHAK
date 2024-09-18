@@ -118,7 +118,7 @@ export default function Home() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl mb-5"
+              className="bg-[#2C2C29] h-20 w-full  rounded-2xl mb-5"
               onPress={() => navigation.navigate('databreachdetector')} 
             >
               <Text className="ml-4 mt-6 text-2xl text-white font-semibold">

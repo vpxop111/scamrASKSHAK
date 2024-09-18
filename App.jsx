@@ -2,7 +2,7 @@ import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {TaskProvider} from './TaskContext'; // Import TaskProvider
-import {AuthProvider} from './AuthContext'; // Import AuthProvider
+import AuthProvider from './AuthContext'; // Make sure this import is correct
 import Home from './screens/Home';
 import Welcome from './screens/Welcome';
 import Signup from './screens/Signup';
@@ -21,11 +21,12 @@ import Sms from './screens/Sms';
 import Website from './screens/Website';
 import Phone from './screens/Phone';
 import SpecificNews from './screens/SpecificNews';
-import {BackgroundTaskProvider} from './BackgroundTaskContext';
+import BackgroundTaskProvider from './BackgroundTaskContext';
 import Websitedetection from './screens/Websitedetection';
 import BottomNavigation from './screens/BottomNavigation';
 import ImageUpload from './screens/ImageUpload';
 import Databreachdetector from './screens/Databreachdetector';
+
 const Stack = createStackNavigator();
 
 const App = () => {

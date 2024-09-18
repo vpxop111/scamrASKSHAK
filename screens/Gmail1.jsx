@@ -26,6 +26,7 @@ import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AuthContext} from '../AuthContext';
 import {FlatList} from 'react-native-gesture-handler';
+import { useBackgroundTask } from '../BackgroundTaskContext';
 
 const {width, height} = Dimensions.get('window');
 
@@ -80,6 +81,7 @@ PushNotification.createChannel(
 const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
 const Gmail1 = () => {
+  const { isTaskRunning, timer, startTask, stopTask } = useBackgroundTask();
   const {user} = useContext(AuthContext);
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
@@ -87,7 +89,6 @@ const Gmail1 = () => {
   const [latestEmailId, setLatestEmailId] = useState(null);
   const [emailStatus, setEmailStatus] = useState(null);
   const [confidence, setConfidence] = useState(null);
-  const [timer, setTimer] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
   const [scammerStatus, setScammerStatus] = useState({
     isScammer: false,
@@ -96,13 +97,13 @@ const Gmail1 = () => {
   });
   const [scamEmails, setScamEmails] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [isTaskRunning, setIsTaskRunning] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const scammerCacheRef = useRef({});
   const notifiedScammersRef = useRef({});
 
   useEffect(() => {
     configureGoogleSignin();
-    checkAndStartBackgroundTask();
+    checkLoginStatus();
 
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
@@ -146,17 +147,9 @@ const Gmail1 = () => {
     }
   };
 
-  const checkAndStartBackgroundTask = async () => {
-    try {
-      const isTaskStarted = await AsyncStorage.getItem(
-        'isBackgroundTaskStarted',
-      );
-      if (isTaskStarted === 'true') {
-        setIsTaskRunning(true);
-      }
-    } catch (error) {
-      console.error('Error checking background task status:', error);
-    }
+  const checkLoginStatus = async () => {
+    const gmailUserInfo = await AsyncStorage.getItem('gmailUserInfo');
+    setIsLoggedIn(!!gmailUserInfo);
   };
 
   const configureGoogleSignin = async () => {
@@ -241,28 +234,6 @@ const Gmail1 = () => {
       setIsLoading(false);
     }
   }, [latestEmailId, isLoading, userInfo]);
-
-  // Timer countdown in seconds
-
-  useEffect(() => {
-    // Fetch immediately on mount
-    fetchLatestEmail();
-
-    // Set up the timer interval
-    const intervalId = setInterval(() => {
-      setTimer(prevTimer => {
-        if (prevTimer <= 1) {
-          // Fetch email when timer hits zero
-          fetchLatestEmail();
-          return 60; // Reset timer
-        }
-        return prevTimer - 1;
-      });
-    }, 1000); // Update timer every second
-
-    // Clear interval on unmount
-    return () => clearInterval(intervalId);
-  }, [fetchLatestEmail]);
 
   const base64UrlDecode = str => {
     try {
@@ -373,67 +344,21 @@ const Gmail1 = () => {
     }
   }, [user]);
 
-  const startTask = async () => {
-    try {
-      const options = {
-        taskName: 'Gmail Background Task',
-        taskTitle: 'Fetching New Emails',
-        taskDesc: 'Checking for new emails and detecting scams',
-        taskIcon: {
-          name: 'ic_launcher',
-          type: 'mipmap',
-        },
-        color: '#FF6347',
-        linkingURL: 'yourapp://chat',
-        parameters: {delay: 10000},
-      };
-
-      await BackgroundService.start(task, options);
-      setIsTaskRunning(true);
-      await AsyncStorage.setItem('isBackgroundTaskStarted', 'true');
-    } catch (error) {
-      console.error('Error starting background task:', error);
-      Alert.alert('Error', 'Failed to start background task');
-    }
-  };
-
-  const stopTask = async () => {
-    try {
-      await BackgroundService.stop();
-      setIsTaskRunning(false);
-      await AsyncStorage.removeItem('isBackgroundTaskStarted');
-    } catch (error) {
-      console.error('Error stopping background task:', error);
-      Alert.alert('Error', 'Failed to stop background task');
-    }
-  };
-
-  const task = async taskDataArguments => {
-    while (BackgroundService.isRunning()) {
+  const handleGmailTask = async () => {
+    if (isLoggedIn) {
+      console.log('[Gmail] Fetching Gmail data...');
       await fetchLatestEmail();
-      await sleep(60000); // Run every minute
+      console.log('[Gmail] Gmail fetch completed');
+    } else {
+      console.log('[Gmail] User not logged in, skipping Gmail fetch');
     }
   };
 
-  const handleStartButtonPress = async () => {
+  const toggleTask = () => {
     if (isTaskRunning) {
-      Alert.alert(
-        'Task Already Running',
-        'The background task is already running.',
-      );
+      stopTask();
     } else {
-      await startTask();
-    }
-  };
-
-  const handleStopButtonPress = async () => {
-    if (isTaskRunning) {
-      await stopTask();
-    } else {
-      Alert.alert(
-        'No Task Running',
-        'No background task is currently running.',
-      );
+      startTask(() => {}, handleGmailTask);
     }
   };
 
@@ -581,16 +506,9 @@ const Gmail1 = () => {
       <View className="flex-row justify-around mt-4">
         <TouchableOpacity
           className="bg-[#ddff00] p-3 rounded-lg flex-1 mr-2"
-          onPress={handleStartButtonPress}>
+          onPress={toggleTask}>
           <Text className="text-white text-center text-lg text-black">
-            Start Background Task
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          className="bg-red-600 p-3 rounded-lg flex-1 ml-2"
-          onPress={handleStopButtonPress}>
-          <Text className="text-white text-center text-lg">
-            Stop Background Task
+            {isTaskRunning ? 'Stop Scanning' : 'Start Scanning'}
           </Text>
         </TouchableOpacity>
       </View>
