@@ -81,8 +81,8 @@ PushNotification.createChannel(
 const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
 const Gmail1 = () => {
-  const { isTaskRunning, timer, startTask, stopTask } = useBackgroundTask();
-  const {user} = useContext(AuthContext);
+  const { isTaskRunning, startTask, stopTask } = useBackgroundTask();
+  const { user } = useContext(AuthContext);
   const [userInfo, setUserInfo] = useState(null);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
@@ -101,6 +101,9 @@ const Gmail1 = () => {
   const scammerCacheRef = useRef({});
   const notifiedScammersRef = useRef({});
 
+  // Ensure this is declared only once
+  const [timer, setTimer] = useState(60); // Timer state
+
   useEffect(() => {
     configureGoogleSignin();
     checkLoginStatus();
@@ -114,11 +117,20 @@ const Gmail1 = () => {
       handleAppStateChange,
     );
 
+    // Set up interval for fetching emails every minute
+    let fetchInterval;
+    if (isLoggedIn) {
+      fetchInterval = setInterval(() => {
+        fetchLatestEmail();
+      }, 60000); // 60000 ms = 1 minute
+    }
+
     return () => {
       backHandler.remove();
       appStateSubscription.remove();
+      clearInterval(fetchInterval); // Clear interval on unmount
     };
-  }, []);
+  }, [isLoggedIn]); // Dependency on isLoggedIn
 
   const onBackPress = () => {
     if (isTaskRunning) {
@@ -149,7 +161,14 @@ const Gmail1 = () => {
 
   const checkLoginStatus = async () => {
     const gmailUserInfo = await AsyncStorage.getItem('gmailUserInfo');
-    setIsLoggedIn(!!gmailUserInfo);
+    if (gmailUserInfo) {
+      setUserInfo(JSON.parse(gmailUserInfo)); // Set user info if logged in
+      setIsLoggedIn(true); // Update logged-in state
+      console.log('User is logged in:', JSON.parse(gmailUserInfo).email); // Log user email
+    } else {
+      setIsLoggedIn(false); // Update logged-out state
+      console.log('User is not logged in'); // Log user not logged in
+    }
   };
 
   const configureGoogleSignin = async () => {
@@ -171,17 +190,19 @@ const Gmail1 = () => {
 
     setIsSigninInProgress(true);
     try {
-      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
-      const userInfo = await GoogleSignin.signIn();
-      setUserInfo(userInfo);
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const userInfo = await GoogleSignin.signIn();
+        setUserInfo(userInfo);
+        await AsyncStorage.setItem('gmailUserInfo', JSON.stringify(userInfo)); // Store user info
+        console.log('User signed in:', userInfo); // Log user info
     } catch (error) {
-      console.error('Sign-In Error:', error);
-      Alert.alert(
-        'Sign-In Error',
-        'An error occurred during sign-in. Please try again.',
-      );
+        console.error('Sign-In Error:', error);
+        Alert.alert(
+            'Sign-In Error',
+            'An error occurred during sign-in. Please try again.',
+        );
     } finally {
-      setIsSigninInProgress(false);
+        setIsSigninInProgress(false);
     }
   };
 
@@ -250,18 +271,20 @@ const Gmail1 = () => {
   };
 
   const sendEmailToApi = async email => {
-    const subject =
-      email.payload.headers.find(
-        header => header.name.toLowerCase() === 'subject',
-      )?.value || 'No subject';
+    const subjectHeader = email.payload.headers.find(
+      header => header.name.toLowerCase() === 'subject',
+    );
+    const subject = subjectHeader ? subjectHeader.value : 'No subject';
+
     const bodyPart = email.payload.parts
       ? email.payload.parts.find(part => part.mimeType === 'text/plain')?.body
           ?.data
       : email.snippet;
     const body = bodyPart ? base64UrlDecode(bodyPart) : 'No body';
-    const sender =
-      email.payload.headers.find(header => header.name.toLowerCase() === 'from')
-        ?.value || 'Unknown sender';
+
+    const senderHeader = email.payload.headers.find(header => header.name.toLowerCase() === 'from');
+    const sender = senderHeader ? senderHeader.value : 'Unknown sender';
+
     const emailData = {subject, body};
 
     try {
@@ -379,6 +402,27 @@ const Gmail1 = () => {
       console.error('Error deleting scam message:', error);
     }
   };
+
+  // Timer countdown in seconds
+  useEffect(() => {
+    // Fetch immediately on mount
+    fetchLatestEmail();
+
+    // Set up the timer interval
+    const intervalId = setInterval(() => {
+      setTimer(prevTimer => {
+        if (prevTimer <= 1) {
+          // Fetch email when timer hits zero
+          fetchLatestEmail();
+          return 60; // Reset timer
+        }
+        return prevTimer - 1;
+      });
+    }, 1000); // Update timer every second
+
+    // Clear interval on unmount
+    return () => clearInterval(intervalId);
+  }, [fetchLatestEmail]);
 
   return (
     <SafeAreaView className="flex-1 bg-black">
