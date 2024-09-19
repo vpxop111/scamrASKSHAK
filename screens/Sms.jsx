@@ -16,11 +16,11 @@ import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabase';
 import { AuthContext } from '../AuthContext';
-import { BackgroundTaskContext } from '../BackgroundTaskContext'; // Import the BackgroundTaskContext
+import { BackgroundTaskContext } from '../BackgroundTaskContext';
 
 const Sms = () => {
   const { user } = useContext(AuthContext);
-  const { isTaskRunning, startTask, stopTask } = useContext(BackgroundTaskContext); // Use the context
+  const { isTaskRunning, startTask, stopTask } = useContext(BackgroundTaskContext);
   const [latestSms, setLatestSms] = useState('');
   const [smsSender, setSmsSender] = useState('');
   const [predictedResult, setPredictedResult] = useState('');
@@ -100,7 +100,40 @@ const Sms = () => {
   };
 
   const fetchScamMessages = async () => {
-    // Fetch scam messages from the database
+    try {
+      if (!user || !user.email) {
+        console.error('User email not found');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('scamsms')
+        .select('*')
+        .eq('sid', user.email);
+
+      if (error) {
+        console.error('Error fetching scam messages:', error);
+      } else {
+        setScamMessages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching scam messages:', error);
+    }
+  };
+
+  const deleteScamMessage = async id => {
+    try {
+      const { error } = await supabase.from('scamsms').delete().eq('id', id);
+
+      if (error) {
+        console.error('Error deleting scam message:', error);
+      } else {
+        console.log('Scam message successfully deleted.');
+        fetchScamMessages(); // Refresh the list after deletion
+      }
+    } catch (error) {
+      console.error('Error deleting scam message:', error);
+    }
   };
 
   const toggleTask = () => {
