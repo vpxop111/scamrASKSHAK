@@ -20,8 +20,7 @@ import {
   Dimensions,
 } from 'react-native';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
-import {supabase} from '../supabase';
-import BackgroundService from 'react-native-background-actions';
+import {supabase} from '../supabase';  
 import PushNotification from 'react-native-push-notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AuthContext} from '../AuthContext';

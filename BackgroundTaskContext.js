@@ -145,7 +145,7 @@ const BackgroundTaskProvider = ({ children }) => {
   const sendToApi = async (type, content) => {
     let apiEndpoint;
     if (type === 'sms') {
-      apiEndpoint = 'https://varun324242-sssssss.hf.space/predict';
+      apiEndpoint = 'https://varun324242-s1.hf.space/predict';
     } else if (type === 'gmail') {
       apiEndpoint = 'https://varun324242-gmail.hf.space/predict';
     } else {
@@ -157,7 +157,7 @@ const BackgroundTaskProvider = ({ children }) => {
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ text: content }),
       });
       const result = await response.json();
       console.log(`[BackgroundTask] ${type.toUpperCase()} API Response:`, result);
