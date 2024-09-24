@@ -14,12 +14,8 @@ const Websitedetection = () => {
     setResponse(null); // Reset response
 
     try {
-      const res = await fetch('https://varun324242-sweb.hf.space/predict', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
+      const res = await fetch(`https://www.ipqualityscore.com/api/json/url/TxH6zFytLbaR1rBs37R8PV7iqjK9Ru1w/${encodeURIComponent(url)}`, {
+        method: 'GET', // Change to GET method
       });
 
       if (!res.ok) throw new Error('Network response was not ok');
@@ -61,12 +57,21 @@ const Websitedetection = () => {
           response && (
             <View className="mt-4 p-4 border border-gray-700 rounded-md bg-gray-800">
               <Text className="text-xl font-semibold mb-2 text-[#ddff00]">Response:</Text>
-              <Text className="text-base text-gray-300">URL: {response.url}</Text>
-              <Text className="text-base text-gray-300">Prediction: {response.prediction}</Text>
-              <Text className="text-base text-gray-300">Probability: {response.probability}</Text>
-              {response && response.stype1 && (
-                <Text className="text-base text-gray-300">SType1: {response.stype1}</Text>
-              )}
+              <Text className="text-base text-gray-300">Message: {response.message}</Text>
+              <Text className="text-base text-gray-300">Success: {response.success ? 'Yes' : 'No'}</Text>
+              <Text className="text-base text-gray-300">Unsafe: {response.unsafe ? 'Yes' : 'No'}</Text>
+              <Text className="text-base text-gray-300">Domain: {response.domain}</Text>
+              <Text className="text-base text-gray-300">IP Address: {response.ip_address}</Text>
+              <Text className="text-base text-gray-300">Server: {response.server}</Text>
+              <Text className="text-base text-gray-300">Status Code: {response.status_code}</Text>
+              <Text className="text-base text-gray-300">Risk Score: {response.risk_score}</Text>
+              <Text className="text-base text-gray-300">Final URL: {response.final_url}</Text>
+              <Text className="text-base text-gray-300">Scanned URL: {response.scanned_url}</Text>
+              <Text className="text-base text-gray-300">Domain Trust: {response.domain_trust}</Text>
+              <Text className="text-base text-gray-300">Domain Age: {response.domain_age.human}</Text>
+              <Text className="text-base text-gray-300">DNS Valid: {response.dns_valid ? 'Yes' : 'No'}</Text>
+              <Text className="text-base text-gray-300">Suspicious: {response.suspicious ? 'Yes' : 'No'}</Text>
+              {/* Add more fields as necessary */}
             </View>
           )
         )}
