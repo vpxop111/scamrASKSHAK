@@ -26,12 +26,14 @@ import Websitedetection from './screens/Websitedetection';
 import BottomNavigation from './screens/BottomNavigation';
 import ImageUpload from './screens/ImageUpload';
 import Databreachdetector from './screens/Databreachdetector';
+import { ThemeProvider } from './ThemeContext';
 
 const Stack = createStackNavigator();
 
 const App = () => {
   return (
     <AuthProvider>
+       <ThemeProvider>
       <BackgroundTaskProvider>
         <TaskProvider>
           <NavigationContainer>
@@ -108,6 +110,7 @@ const App = () => {
           </NavigationContainer>
         </TaskProvider>
       </BackgroundTaskProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 };

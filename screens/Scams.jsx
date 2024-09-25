@@ -1,18 +1,21 @@
-import React, {useState, useEffect} from 'react';
-import {View, Text, FlatList, Button} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
-import {supabase} from '../supabase'; // Adjust the import path if necessary
-import {TouchableOpacity} from 'react-native-gesture-handler';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../supabase'; // Adjust the import path if necessary
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import BottomNavigationBar from './BottomNavigation';
+import { useTheme } from '../ThemeContext'; // Import your theme context
+
 export default function Scams() {
   const [scams, setScams] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
+  const { isDarkMode } = useTheme(); // Access dark mode state
 
   useEffect(() => {
     const getScams = async () => {
       try {
-        const {data, error} = await supabase.from('scam').select();
+        const { data, error } = await supabase.from('scam').select();
 
         if (error) {
           console.error('Error fetching scams:', error.message);
@@ -37,7 +40,7 @@ export default function Scams() {
   }, []);
 
   return (
-    <View className="flex-1 bg-[#0D0E10]">
+    <View className="flex-1 bg-[#0D0E10] dark:bg-[#0D0E10]"> 
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <Text className="text-white">Loading...</Text>
@@ -52,8 +55,8 @@ export default function Scams() {
           <FlatList
             data={scams}
             keyExtractor={item => item.id.toString()}
-            renderItem={({item}) => (
-              <View className="py-4 border-b border-gray-300">
+            renderItem={({ item }) => (
+              <View className="py-4 border-b border-gray-300 dark:border-gray-600">
                 <TouchableOpacity
                   className="bg-[#ddff00] p-5 rounded-lg"
                   onPress={() =>
@@ -61,8 +64,9 @@ export default function Scams() {
                       stype: item.scam_type,
                       s_id: item.id,
                     })
-                  }>
-                  <Text className="text-black text-xl font-bold">
+                  }
+                >
+                  <Text className={`text-xl font-bold ${isDarkMode ? 'text-black' : 'text-black'}`}>
                     {item.scam_type}
                   </Text>
                 </TouchableOpacity>

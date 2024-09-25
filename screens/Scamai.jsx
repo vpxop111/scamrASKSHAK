@@ -1,31 +1,33 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
-  Button,
-  FlatList,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import axios from 'axios'; // Import axios for making HTTP requests
-import {TouchableOpacity} from 'react-native-gesture-handler';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import BottomNavigationBar from './BottomNavigation';
+import { useTheme } from '../ThemeContext'; // Import your theme context
+
 const Scamai = () => {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [chatHistory, setChatHistory] = useState([
     {
       role: 'system',
-      content:
-        "Hello! I'm your Scam Secure Assistant. Ask me anything about staying safe from scams.",
+      content: "Hello! I'm your Scam Secure Assistant. Ask me anything about staying safe from scams.",
     },
   ]);
+  
+  const { isDarkMode } = useTheme(); // Access dark mode state
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
     // Add user message to chat history
-    const userMessage = {role: 'user', content: input.trim()};
+    const userMessage = { role: 'user', content: input.trim() };
     setChatHistory(prevChat => [...prevChat, userMessage]);
     setInput('');
     setLoading(true);
@@ -40,7 +42,7 @@ const Scamai = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`,
+            Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`, // Replace with your API key
           },
         },
       );
@@ -54,22 +56,22 @@ const Scamai = () => {
     }
   };
 
-  const renderItem = ({item}) => (
+  const renderItem = ({ item }) => (
     <View className="my-2">
       <Text
         className={`${
           item.role === 'user'
             ? 'self-end bg-[#ddff00]'
             : 'self-start bg-gray-200'
-        } p-2 rounded-lg`}>
+        } p-2 rounded-lg text-black`} // Set text color to black
+      >
         {item.content}
       </Text>
-      
     </View>
   );
 
   return (
-    <View className="flex-1 p-5 bg-[#0D0E10]">
+    <View className="flex-1 p-5 bg-[#0D0E10] dark:bg-[#0D0E10]">
       <FlatList
         data={chatHistory}
         renderItem={renderItem}
@@ -86,8 +88,9 @@ const Scamai = () => {
         />
         <TouchableOpacity
           onPress={handleSend}
-          className="bg-[#ddff00] rounded-xl p-3">
-          <Text className=" text-blakc p rounded-lg font-bold">Send</Text>
+          className="bg-[#ddff00] rounded-xl p-3"
+        >
+          <Text className="text-black font-bold">Send</Text> 
         </TouchableOpacity>
       </View>
       <BottomNavigationBar />

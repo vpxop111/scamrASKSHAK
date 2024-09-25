@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,11 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import BottomNavigationBar from './BottomNavigation';
+
 // Replace with your GNews API key
 const GNEWS_API_KEY = '4e7471e098930c7d98dc3495a9752490';
 
-const Scamnews = ({navigation}) => {
+const Scamnews = ({ navigation }) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,21 +50,24 @@ const Scamnews = ({navigation}) => {
         <FlatList
           data={news}
           keyExtractor={item => item.url}
-          renderItem={({item}) => (
+          renderItem={({ item }) => (
             <TouchableOpacity
               className="flex-row mb-5 p-4 bg-white rounded-lg shadow-md"
               onPress={() =>
-                navigation.navigate('SpecificNews', {article: item})
-              }>
+                navigation.navigate('SpecificNews', { article: item })
+              }
+            >
               {item.image && (
                 <Image
-                  source={{uri: item.image}}
+                  source={{ uri: item.image }}
                   className="w-24 h-24 rounded-lg mr-4"
                 />
               )}
               <View className="flex-1">
-                <Text className="text-lg font-bold mb-2">{item.title}</Text>
-                <Text className="text-base text-gray-600">
+                <Text className="text-lg font-bold mb-2 text-black"> 
+                  {item.title}
+                </Text>
+                <Text className="text-base text-gray-800"> 
                   {item.description}
                 </Text>
               </View>
@@ -71,7 +75,7 @@ const Scamnews = ({navigation}) => {
           )}
         />
       )}
-      <BottomNavigationBar /> 
+      <BottomNavigationBar />
     </View>
   );
 };
