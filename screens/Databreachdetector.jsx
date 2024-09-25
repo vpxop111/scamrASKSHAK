@@ -29,6 +29,7 @@ const DataBreachChecker = () => {
       const result = response.data;
       if (result.success) {
         Alert.alert('Data Breach Info', `Breach Status: ${result.found ? 'Breached' : 'Safe'}`);
+        setInput(''); // Clear the input field after receiving the result
       } else {
         Alert.alert('Error', 'Something went wrong. Please try again.');
       }
@@ -45,14 +46,20 @@ const DataBreachChecker = () => {
       <View className="flex-row mb-4">
         <TouchableOpacity
           className={`px-4 py-2 rounded-full ${type === 'email' ? 'bg-[#ddff00]' : 'bg-gray-700'}`}
-          onPress={() => setType('email')}
+          onPress={() => {
+            setType('email');
+            setInput(''); // Clear the input field when switching to email
+          }}
         >
           <Text className={`${type === 'email' ? 'text-black' : 'text-[#ddff00]'}`}>Email</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           className={`px-4 py-2 ml-4 rounded-full ${type === 'username' ? 'bg-[#ddff00]' : 'bg-gray-700'}`}
-          onPress={() => setType('username')}
+          onPress={() => {
+            setType('username');
+            setInput(''); // Clear the input field when switching to username
+          }}
         >
           <Text className={`${type === 'username' ? 'text-black' : 'text-[#ddff00]'}`}>Username</Text>
         </TouchableOpacity>

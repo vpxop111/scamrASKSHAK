@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Button, Image, Alert, ActivityIndicator, TouchableOpacity, ScrollView, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, Alert, ActivityIndicator, TouchableOpacity, ScrollView, Image } from 'react-native'; // Added Image import
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 
@@ -7,6 +7,7 @@ export default function App() {
   const [image, setImage] = useState(null);
   const [extractedText, setExtractedText] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const scrollRef = useRef(); // Create a ref for the ScrollView
 
   const pickImageFromGallery = () => {
@@ -65,6 +66,7 @@ export default function App() {
     console.log('FormData created:', formData); // Log FormData details
 
     setLoading(true);
+    setStatusMessage('Extracting text...');
 
     try {
       console.log('Sending image to OCR API...');
@@ -82,10 +84,12 @@ export default function App() {
         const textArray = response.data.map(item => item.text);
         console.log('Text Array:', textArray); // Log the array of text items
 
-        const sentences = textArray.join(' ').split(/(?<=[.!?])\s+/); // Split by punctuation followed by whitespace
+        // Clean up the extracted text
+        const cleanedTextArray = textArray.map(text => cleanText(text));
+        const sentences = cleanedTextArray.join(' ').split(/(?<=[.!?])\s+/); // Split by punctuation followed by whitespace
         console.log('Extracted Sentences:', sentences); // Log the extracted sentences
         setExtractedText(sentences);
-        sendToScamAPI(sentences); // Send the sentences to the Scam API
+        await sendToScamAPI(sentences); // Send the sentences to the Scam API
       } else {
         console.log('No text found in response data');
         setExtractedText(['No text found']);
@@ -102,9 +106,14 @@ export default function App() {
     }
   };
 
+  const cleanText = (text) => {
+    // Remove unnecessary special symbols and trim whitespace
+    return text.replace(/[^\w\s.,!?]/g, '').trim();
+  };
+
   const sendToScamAPI = async (messages) => {
     setLoading(true);
-    console.log('Sending messages to scam detection API:', messages);
+    setStatusMessage('Sending messages to scam detection API...');
 
     try {
       const response = await axios.post('https://varun324242-dds.hf.space/predict', {
@@ -135,6 +144,7 @@ export default function App() {
       Alert.alert('Error', 'Failed to analyze messages');
     } finally {
       setLoading(false);
+      setStatusMessage(''); // Clear status message after processing
     }
   };
 
@@ -148,6 +158,7 @@ export default function App() {
         
         {image && <Image source={{ uri: image }} className="w-72 h-72 resize-mode-contain my-2" />}
         {loading && <ActivityIndicator size="large" color="#ddff00" />}
+        {statusMessage && <Text className="text-lg text-white">{statusMessage}</Text>}
         <Text className="text-xl font-bold text-[#ddff00] mt-5">Extracted Text:</Text>
         {extractedText.map((sentence, index) => (
           <Text key={index} className="text-base mt-2 text-white text-center">{sentence}</Text>

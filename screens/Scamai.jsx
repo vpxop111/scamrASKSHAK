@@ -40,7 +40,7 @@ const Scamai = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer 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`,
+            Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`,
           },
         },
       );
@@ -64,6 +64,7 @@ const Scamai = () => {
         } p-2 rounded-lg`}>
         {item.content}
       </Text>
+      
     </View>
   );
 

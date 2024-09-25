@@ -4,7 +4,7 @@ import SmsAndroid from 'react-native-get-sms-android';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import PushNotification from 'react-native-push-notification';
-import { supabase } from './supabase'; // Import supabase client
+import { supabase } from '../supabaseClient'; // Import supabase client
 import { AuthContext } from './AuthContext';
 
 // Define your Google Client IDs
@@ -157,7 +157,7 @@ const BackgroundTaskProvider = ({ children }) => {
       
       const { data, error } = await supabase
         .from('scamsms')
-        .insert([{ scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email }]); // Use user.email for sid
+        .insert([{ scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email }]);
 
       if (error) {
         console.error('Error storing scam SMS in Supabase:', error);
@@ -172,16 +172,11 @@ const BackgroundTaskProvider = ({ children }) => {
   // Store scam Gmail message in Supabase
   const storeScamEmail = async (sender, subject, body) => {
     try {
-      if (!user || !user.email) {
-        console.error('User email not found');
-        return;
-      }
-
       console.log(`[BackgroundTask] Storing scam email - Sender: ${sender}, Subject: ${subject}, Body: ${body}`);
       
       const { data, error } = await supabase
         .from('scam_email')
-        .insert([{ sid: user.email, sender: sender, scam_head: subject, scam_body: body }]); // Use user.email for sid
+        .insert([{ sid: user.email, sender: sender, scam_head: subject, scam_body: body }]);
 
       if (error) {
         console.error('Error storing scam email in Supabase:', error);

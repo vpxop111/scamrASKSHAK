@@ -39,42 +39,39 @@ const Scamnews = ({navigation}) => {
     fetchNews();
   }, []);
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-100">
-        <ActivityIndicator size="large" color="#0000ff" />
-        <BottomNavigationBar />
-      </View>
-    );
-  }
-
   return (
-    <View className="flex-1 p-5 bg-[#0D0E10]">
-      <FlatList
-        data={news}
-        keyExtractor={item => item.url}
-        renderItem={({item}) => (
-          <TouchableOpacity
-            className="flex-row mb-5 p-4 bg-white rounded-lg shadow-md"
-            onPress={() =>
-              navigation.navigate('SpecificNews', {article: item})
-            }>
-            {item.image && (
-              <Image
-                source={{uri: item.image}}
-                className="w-24 h-24 rounded-lg mr-4"
-              />
-            )}
-            <View className="flex-1">
-              <Text className="text-lg font-bold mb-2">{item.title}</Text>
-              <Text className="text-base text-gray-600">
-                {item.description}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-      <BottomNavigationBar />
+    <View className="flex-1 bg-[#0D0E10]">
+      {loading ? (
+        <View className="flex-1 justify-center items-center bg-gray-100">
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      ) : (
+        <FlatList
+          data={news}
+          keyExtractor={item => item.url}
+          renderItem={({item}) => (
+            <TouchableOpacity
+              className="flex-row mb-5 p-4 bg-white rounded-lg shadow-md"
+              onPress={() =>
+                navigation.navigate('SpecificNews', {article: item})
+              }>
+              {item.image && (
+                <Image
+                  source={{uri: item.image}}
+                  className="w-24 h-24 rounded-lg mr-4"
+                />
+              )}
+              <View className="flex-1">
+                <Text className="text-lg font-bold mb-2">{item.title}</Text>
+                <Text className="text-base text-gray-600">
+                  {item.description}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+      <BottomNavigationBar /> 
     </View>
   );
 };

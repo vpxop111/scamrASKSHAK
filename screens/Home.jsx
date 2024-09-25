@@ -38,7 +38,7 @@ export default function Home() {
             <View className="flex flex-row mx-5 items-center">
               <View className="flex flex-row mt-2">
                 <Text className="text-[#ddff00] text-2xl font-bold">S</Text>
-                <Text className="text-2xl font-bold text-white">camRakshak</Text>
+                <Text className="text-2xl font-bold text-white">camSafe</Text>
               </View>
               <TouchableOpacity
                 className="bg-[#ddff00] text-black h-12 pr-5 ml-10 rounded-full"
@@ -61,16 +61,7 @@ export default function Home() {
               </Text>
             </View>
           </View>
-          <View className="h-12 mx-5 border bg-[#2C2C29] border-[#2C2C29] mt-8 flex flex-row rounded-xl">
-            <Text className="text-[#FFB200] text-xl font-semibold ml-8 mt-2">
-              Likely
-            </Text>
-            <Text className="text-white text-xl font-semibold ml-2 mt-2">23</Text>
-            <Text className="text-red-500 text-xl font-semibold ml-14 mt-2">
-              Scam
-            </Text>
-            <Text className="text-white text-xl font-semibold ml-4 mt-2">2</Text>
-          </View>
+          
           <View className="mx-5 flex flex-col mt-8">
             <Text className="text-white text-xl font-medium">Features</Text>
             <TouchableOpacity
@@ -80,15 +71,6 @@ export default function Home() {
               }}>
               <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
                 SMS
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="bg-[#2C2C29] h-20 w-full mt-5 rounded-2xl"
-              onPress={() => {
-                navigation.navigate('phone');
-              }}>
-              <Text className="ml-4 mt-6 text-2xl text-white font-semibold">
-                Phone Call
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

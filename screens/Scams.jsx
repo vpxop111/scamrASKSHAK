@@ -36,46 +36,42 @@ export default function Scams() {
     getScams();
   }, []);
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
-
-  if (scams.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-[#0D0E10]">
-        <Text className="text-white">No scams found</Text>
-      </View>
-    );
-  }
-
   return (
-    <View className="flex-1 p-5 bg-[#0D0E10]">
-      <Text className="text-2xl font-bold mb-5 text-white">Scam List</Text>
-      <FlatList
-        data={scams}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({item}) => (
-          <View className="py-4 border-b border-gray-300">
-            <TouchableOpacity
-              className="bg-[#ddff00] p-5 rounded-lg"
-              onPress={() =>
-                navigation.navigate('mscam', {
-                  stype: item.scam_type,
-                  s_id: item.id,
-                })
-              }>
-              <Text className="text-black text-xl font-bold">
-                {item.scam_type}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
-      <BottomNavigationBar />
+    <View className="flex-1 bg-[#0D0E10]">
+      {loading ? (
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-white">Loading...</Text>
+        </View>
+      ) : scams.length === 0 ? (
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-white">No scams found</Text>
+        </View>
+      ) : (
+        <View className="flex-1 p-5">
+          <Text className="text-2xl font-bold mb-5 text-white">Scam List</Text>
+          <FlatList
+            data={scams}
+            keyExtractor={item => item.id.toString()}
+            renderItem={({item}) => (
+              <View className="py-4 border-b border-gray-300">
+                <TouchableOpacity
+                  className="bg-[#ddff00] p-5 rounded-lg"
+                  onPress={() =>
+                    navigation.navigate('mscam', {
+                      stype: item.scam_type,
+                      s_id: item.id,
+                    })
+                  }>
+                  <Text className="text-black text-xl font-bold">
+                    {item.scam_type}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        </View>
+      )}
+      <BottomNavigationBar /> 
     </View>
   );
 }

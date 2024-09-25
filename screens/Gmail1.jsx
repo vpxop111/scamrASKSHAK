@@ -344,27 +344,64 @@ const Gmail1 = () => {
   };
 
   const fetchScamEmails = async () => {
+    console.log('Fetching scam emails...');
     try {
-      const {data, error} = await supabase
+      if (!user || !user.email) {
+        console.error('User email not found');
+        return;
+      }
+
+      const { data, error } = await supabase
         .from('scam_email')
         .select('*')
         .eq('sid', user.email);
+
       if (error) {
-        throw error;
+        console.error('Error fetching scam emails:', error);
+      } else {
+        console.log('Fetched scam emails:', data);
+        setScamEmails(data);
       }
-      setScamEmails(data || []);
-      console.log('Scam emails fetched successfully:', data);
     } catch (error) {
       console.error('Error fetching scam emails:', error);
-      Alert.alert('Error', 'Failed to fetch scam emails');
     }
   };
 
   useEffect(() => {
-    if (user.email) {
-      fetchScamEmails();
-    }
+    fetchScamEmails();
+
+    // Subscribe to real-time updates
+    const channel = supabase.channel(`public:scam_email`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'scam_email',
+      }, payload => {
+        console.log('Change received!', payload);
+        fetchScamEmails(); // Refresh the list after any change
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel); // Clean up the subscription
+    };
   }, [user]);
+
+  const deleteScamEmail = async id => {
+    console.log('Deleting scam email with ID:', id);
+    try {
+      const { error } = await supabase.from('scam_email').delete().eq('id', id);
+
+      if (error) {
+        console.error('Error deleting scam email:', error);
+      } else {
+        console.log('Scam email successfully deleted.');
+        fetchScamEmails(); // Refresh the list after deletion
+      }
+    } catch (error) {
+      console.error('Error deleting scam email:', error);
+    }
+  };
 
   const handleGmailTask = async () => {
     if (isLoggedIn) {
@@ -381,24 +418,6 @@ const Gmail1 = () => {
       stopTask();
     } else {
       startTask(() => {}, handleGmailTask);
-    }
-  };
-
-  const deleteScamEmail = async id => {
-    try {
-      // Delete the row from the 'scamsms' table where the ID matches
-      const {error} = await supabase.from('scam_email').delete().eq('id', id);
-
-      if (error) {
-        throw error; // Throw error if something went wrong
-      } else {
-        console.log('Scam message successfully deleted from scamsms.');
-
-        // Refresh the list after deletion
-        fetchScamEmails();
-      }
-    } catch (error) {
-      console.error('Error deleting scam message:', error);
     }
   };
 
@@ -476,75 +495,25 @@ const Gmail1 = () => {
         </View>
       )}
 
-      {/* FlatList for Scam Emails */}
       <FlatList
         data={scamEmails}
-        keyExtractor={(item, index) =>
-          item.id ? item.id.toString() : index.toString()
-        } // Use item.id or fallback to index
-        renderItem={({item}) => (
-          <View className="bg-gray-800 p-4 mb-2 rounded-lg border border-gray-600">
-            <Text className="text-lg font-semibold text-white">
+        keyExtractor={item => item.id.toString()}
+        renderItem={({ item }) => (
+          <View className="bg-gray-800 p-4 mb-2 rounded-lg">
+            <Text className="text-white font-semibold">
               Sender: {item.sender}
             </Text>
-            <Text className="text-md text-gray-300">
-              Subject: {item.scam_head}
-            </Text>
-            <Text className="text-sm text-gray-400">{item.scam_body}</Text>
+            <Text className="text-gray-300">Subject: {item.scam_head}</Text>
+            <Text className="text-gray-300">Body: {item.scam_body}</Text>
             <TouchableOpacity
-              className="mt-2 bg-red-600 p-2 rounded-lg"
-              onPress={() => deleteScamEmail(item.id)}>
+              onPress={() => deleteScamEmail(item.id)}
+              className="mt-2 bg-red-600 p-2 rounded-lg">
               <Text className="text-white text-center">Delete</Text>
             </TouchableOpacity>
           </View>
         )}
+        contentContainerStyle={{ padding: 20 }}
       />
-
-      <TouchableOpacity
-        className="bg-blue-500 p-3 rounded-lg mb-4"
-        onPress={() => setModalVisible(true)}>
-        <Text className="text-white text-center text-lg">Show Scam Emails</Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}>
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-70">
-          <View className="bg-gray-900 p-6 rounded-lg">
-            <FlatList
-              data={scamEmails}
-              keyExtractor={item => item.id.toString()}
-              renderItem={({item}) => (
-                <View className="bg-gray-800 p-4 mb-2 rounded-lg border border-gray-600">
-                  <Text className="text-lg font-semibold text-white">
-                    {item.scam_subject}
-                  </Text>
-                  <Text className="text-sm text-gray-400">
-                    {item.scam_body}
-                  </Text>
-                  <TouchableOpacity
-                    className="mt-2 bg-red-600 p-2 rounded-lg"
-                    onPress={() => deleteScamEmail(item.id)}>
-                    <Text className="text-white text-center">Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              ListEmptyComponent={
-                <Text className="text-center text-gray-400">
-                  No scam emails detected.
-                </Text>
-              }
-            />
-            <TouchableOpacity
-              className="bg-blue-500 p-2 rounded-lg mt-4"
-              onPress={() => setModalVisible(false)}>
-              <Text className="text-white text-center">Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <View className="flex-row justify-around mt-4">
         <TouchableOpacity
