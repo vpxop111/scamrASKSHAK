@@ -50,6 +50,7 @@ const Scamnews = ({ navigation }) => {
         <FlatList
           data={news}
           keyExtractor={item => item.url}
+<<<<<<< HEAD
           renderItem={({ item }) => (
             <TouchableOpacity
               className="flex-row mb-5 p-4 bg-white rounded-lg shadow-md"
@@ -60,14 +61,30 @@ const Scamnews = ({ navigation }) => {
               {item.image && (
                 <Image
                   source={{ uri: item.image }}
+=======
+          renderItem={({item}) => (
+            <TouchableOpacity
+              className="flex-row mb-5 p-4 bg-white rounded-lg shadow-md"
+              onPress={() =>
+                navigation.navigate('SpecificNews', {article: item})
+              }>
+              {item.image && (
+                <Image
+                  source={{uri: item.image}}
+>>>>>>> 9f3ab90... bugfix
                   className="w-24 h-24 rounded-lg mr-4"
                 />
               )}
               <View className="flex-1">
+<<<<<<< HEAD
                 <Text className="text-lg font-bold mb-2 text-black"> 
                   {item.title}
                 </Text>
                 <Text className="text-base text-gray-800"> 
+=======
+                <Text className="text-lg font-bold mb-2">{item.title}</Text>
+                <Text className="text-base text-gray-600">
+>>>>>>> 9f3ab90... bugfix
                   {item.description}
                 </Text>
               </View>
@@ -75,7 +92,11 @@ const Scamnews = ({ navigation }) => {
           )}
         />
       )}
+<<<<<<< HEAD
       <BottomNavigationBar />
+=======
+      <BottomNavigationBar /> 
+>>>>>>> 9f3ab90... bugfix
     </View>
   );
 };

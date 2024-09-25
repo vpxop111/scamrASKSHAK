@@ -40,7 +40,11 @@ export default function Scams() {
   }, []);
 
   return (
+<<<<<<< HEAD
     <View className="flex-1 bg-[#0D0E10] dark:bg-[#0D0E10]"> 
+=======
+    <View className="flex-1 bg-[#0D0E10]">
+>>>>>>> 9f3ab90... bugfix
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <Text className="text-white">Loading...</Text>
@@ -55,8 +59,13 @@ export default function Scams() {
           <FlatList
             data={scams}
             keyExtractor={item => item.id.toString()}
+<<<<<<< HEAD
             renderItem={({ item }) => (
               <View className="py-4 border-b border-gray-300 dark:border-gray-600">
+=======
+            renderItem={({item}) => (
+              <View className="py-4 border-b border-gray-300">
+>>>>>>> 9f3ab90... bugfix
                 <TouchableOpacity
                   className="bg-[#ddff00] p-5 rounded-lg"
                   onPress={() =>
@@ -64,9 +73,14 @@ export default function Scams() {
                       stype: item.scam_type,
                       s_id: item.id,
                     })
+<<<<<<< HEAD
                   }
                 >
                   <Text className={`text-xl font-bold ${isDarkMode ? 'text-black' : 'text-black'}`}>
+=======
+                  }>
+                  <Text className="text-black text-xl font-bold">
+>>>>>>> 9f3ab90... bugfix
                     {item.scam_type}
                   </Text>
                 </TouchableOpacity>

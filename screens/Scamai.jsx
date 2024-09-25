@@ -42,7 +42,11 @@ const Scamai = () => {
         {
           headers: {
             'Content-Type': 'application/json',
+<<<<<<< HEAD
             Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`, // Replace with your API key
+=======
+            Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`,
+>>>>>>> 9f3ab90... bugfix
           },
         },
       );
@@ -67,6 +71,7 @@ const Scamai = () => {
       >
         {item.content}
       </Text>
+      
     </View>
   );
 
