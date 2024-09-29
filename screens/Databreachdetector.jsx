@@ -40,7 +40,7 @@ const DataBreachChecker = () => {
 
   return (
     <View className="flex-1 justify-center items-center p-4 bg-black">
-      <Text className="text-xl font-bold mb-6 text-[#ddff00]">Check Data Breach</Text>
+      <Text className="text-xl font-bold mb-6 text-[#ddff00] ">Check Data Breach</Text>
       
       {/* Option to choose email or username */}
       <View className="flex-row mb-4">

@@ -1,104 +1,115 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  ActivityIndicator,
-  FlatList,
-} from 'react-native';
-import axios from 'axios'; // Import axios for making HTTP requests
-import { TouchableOpacity } from 'react-native-gesture-handler';
-import BottomNavigationBar from './BottomNavigation';
-import { useTheme } from '../ThemeContext'; // Import your theme context
+import React, { useEffect, useState } from 'react';
+import { View, Text, PermissionsAndroid, DeviceEventEmitter, Button, NativeModules } from 'react-native';
+import BackgroundService from 'react-native-background-actions';
+
+const { SmsListenerModule } = NativeModules; // Import the native module
+
+const sleep = (time) => new Promise((resolve) => setTimeout(() => resolve(), time));
+
+const sendSmsToServer = async (messageBody) => {
+  try {
+    const response = await fetch('https://varun324242-s1.hf.space/predict', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: messageBody
+      }),
+    });
+    const data = await response.json();
+    console.log('Response from server:', data);
+    return data;
+  } catch (error) {
+    console.error('Error sending SMS to server:', error);
+  }
+};
 
 const Scamai = () => {
-  const [loading, setLoading] = useState(false);
-  const [input, setInput] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    {
-      role: 'system',
-      content: "Hello! I'm your Scam Secure Assistant. Ask me anything about staying safe from scams.",
-    },
-  ]);
-  
-  const { isDarkMode } = useTheme(); // Access dark mode state
+  const [message, setMessage] = useState('');
+  const [isBackgroundServiceRunning, setIsBackgroundServiceRunning] = useState(false);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    // Add user message to chat history
-    const userMessage = { role: 'user', content: input.trim() };
-    setChatHistory(prevChat => [...prevChat, userMessage]);
-    setInput('');
-    setLoading(true);
-
+  const requestSmsPermission = async () => {
     try {
-      const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-3.5-turbo', // Use the desired GPT model
-          messages: [...chatHistory, userMessage],
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-<<<<<<< HEAD
-            Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`, // Replace with your API key
-=======
-            Authorization: `Bearer sk-10QNYWx0M0VSNP4WuzKB0KfT2nwl6hixpk44RQQZB9T3BlbkFJJuuxEmtHSIKeMUSr_Zzrvo5YhlUhO6OCDIH_tPumoA`,
->>>>>>> 9f3ab90... bugfix
-          },
-        },
-      );
-
-      const aiMessage = response.data.choices[0].message;
-      setChatHistory(prevChat => [...prevChat, aiMessage]);
-    } catch (error) {
-      console.error('Error fetching AI response:', error);
-    } finally {
-      setLoading(false);
+      const permission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS);
+      if (permission === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log('SMS permission granted');
+      } else {
+        console.log('SMS permission denied');
+      }
+    } catch (err) {
+      console.log('Error requesting SMS permission:', err);
     }
   };
 
-  const renderItem = ({ item }) => (
-    <View className="my-2">
-      <Text
-        className={`${
-          item.role === 'user'
-            ? 'self-end bg-[#ddff00]'
-            : 'self-start bg-gray-200'
-        } p-2 rounded-lg text-black`} // Set text color to black
-      >
-        {item.content}
-      </Text>
+  const checkSmsListener = () => {
+    console.log('Checking SMS Listener Module...');
+    if (SmsListenerModule) {
+      console.log('SmsListenerModule is available');
+      SmsListenerModule.startListeningToSMS();
+      console.log('Called startListeningToSMS method');
+    } else {
+      console.log('SmsListenerModule is not available');
+    }
+  };
+
+  const startBackgroundService = async () => {
+    const options = {
+      taskName: 'SMS Listener',
+      taskTitle: 'Listening for SMS',
+      taskDesc: 'This app is running in the background to listen for SMS messages.',
+      taskIcon: {
+        name: 'ic_launcher',
+        type: 'mipmap',
+      },
+      color: '#ff0000',
+      linkingURI: 'yourapp://chat',
+      parameters: {
+        delay: 5000,
+      },
+    };
+
+    await BackgroundService.start(backgroundTask, options);
+    setIsBackgroundServiceRunning(true);
+    console.log('Background service started');
+  };
+
+  const stopBackgroundService = async () => {
+    await BackgroundService.stop();
+    setIsBackgroundServiceRunning(false);
+    console.log('Background service stopped');
+  };
+
+  useEffect(() => {
+    requestSmsPermission();
+
+    const foregroundListener = DeviceEventEmitter.addListener('onSMSReceived', async (message) => {
+      console.log('SMS received in foreground:', message);
+      const { messageBody, senderPhoneNumber } = JSON.parse(message);
+      setMessage(messageBody);
+      console.log(`Message from ${senderPhoneNumber}: ${messageBody}`);
       
-    </View>
-  );
+      const serverResponse = await sendSmsToServer(messageBody);
+      console.log('Server response in foreground:', serverResponse);
+    });
+
+    return () => {
+      foregroundListener.remove();
+      if (isBackgroundServiceRunning) {
+        BackgroundService.stop();
+      }
+    };
+  }, []);
 
   return (
-    <View className="flex-1 p-5 bg-[#0D0E10] dark:bg-[#0D0E10]">
-      <FlatList
-        data={chatHistory}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => index.toString()}
-        className="flex-1"
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>SMS Data:</Text>
+      <Text>{message}</Text>
+      <Button title="Start Listening for SMS" onPress={checkSmsListener} />
+      <Button 
+        title={isBackgroundServiceRunning ? "Stop Background Service" : "Start Background Service"} 
+        onPress={isBackgroundServiceRunning ? stopBackgroundService : startBackgroundService}
       />
-      {loading && <ActivityIndicator size="large" color="#0000ff" />}
-      <View className="flex-row items-center mt-4">
-        <TextInput
-          className="flex-1 border-2 text-white border-[#ddff00] rounded-lg p-2 mr-2"
-          value={input}
-          onChangeText={setInput}
-          placeholder="Type a message..."
-        />
-        <TouchableOpacity
-          onPress={handleSend}
-          className="bg-[#ddff00] rounded-xl p-3"
-        >
-          <Text className="text-black font-bold">Send</Text> 
-        </TouchableOpacity>
-      </View>
-      <BottomNavigationBar />
     </View>
   );
 };

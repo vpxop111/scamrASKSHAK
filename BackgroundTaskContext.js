@@ -1,11 +1,13 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { DeviceEventEmitter, NativeModules } from 'react-native';
 import BackgroundService from 'react-native-background-actions';
-import SmsAndroid from 'react-native-get-sms-android';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import PushNotification from 'react-native-push-notification';
-import { supabase } from './supabase'; // Import supabase client
+import { supabase } from './supabase';
 import { AuthContext } from './AuthContext';
+
+const { SmsListenerModule } = NativeModules;
 
 // Define your Google Client IDs
 const WEB_CLIENT_ID = '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
@@ -38,25 +40,6 @@ const BackgroundTaskProvider = ({ children }) => {
   const checkTaskStatus = async () => {
     const status = await AsyncStorage.getItem('backgroundTaskStatus');
     setIsTaskRunning(status === 'running');
-  };
-
-  // Fetch and process SMS messages
-  const fetchAndProcessSms = async () => {
-    console.log('[BackgroundTask] Fetching SMS...');
-    SmsAndroid.list(
-      JSON.stringify({ box: 'inbox', indexFrom: 0, maxCount: 1 }),
-      (fail) => console.log('Failed to fetch SMS:', fail),
-      async (count, smsList) => {
-        const messages = JSON.parse(smsList);
-        if (messages.length > 0) {
-          const latestSms = messages[0];
-          console.log('[BackgroundTask] Latest SMS:', latestSms);
-          await sendToApi('sms', latestSms.body, latestSms.address);
-        } else {
-          console.log('[BackgroundTask] No new SMS found');
-        }
-      }
-    );
   };
 
   // Fetch latest Gmail messages
@@ -157,7 +140,7 @@ const BackgroundTaskProvider = ({ children }) => {
       
       const { data, error } = await supabase
         .from('scamsms')
-        .insert([{ scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email }]); // Use user.email for sid
+        .insert([{ scam_no: cleanPhoneNumber, scam_mes: message, sid: user.email }]);
 
       if (error) {
         console.error('Error storing scam SMS in Supabase:', error);
@@ -181,7 +164,7 @@ const BackgroundTaskProvider = ({ children }) => {
       
       const { data, error } = await supabase
         .from('scam_email')
-        .insert([{ sid: user.email, sender: sender, scam_head: subject, scam_body: body }]); // Use user.email for sid
+        .insert([{ sid: user.email, sender: sender, scam_head: subject, scam_body: body }]);
 
       if (error) {
         console.error('Error storing scam email in Supabase:', error);
@@ -199,6 +182,15 @@ const BackgroundTaskProvider = ({ children }) => {
       setIsTaskRunning(true);
       await AsyncStorage.setItem('backgroundTaskStatus', 'running');
       console.log('[BackgroundTask] Background task is starting...');
+      
+      if (SmsListenerModule) {
+        console.log('SmsListenerModule is available');
+        SmsListenerModule.startListeningToSMS();
+        console.log('Called startListeningToSMS method');
+      } else {
+        console.log('SmsListenerModule is not available');
+      }
+
       BackgroundService.start(backgroundTask, {
         taskName: 'SMS and Gmail Scanner',
         taskTitle: 'Scanning for Scams',
@@ -230,17 +222,19 @@ const BackgroundTaskProvider = ({ children }) => {
   // Define the background task function
   const backgroundTask = async (taskDataArguments) => {
     const { delay } = taskDataArguments;
-    let timer = 60; // Timer state in seconds
     await new Promise(async (resolve) => {
-      while (BackgroundService.isRunning()) {
-        console.log(`[BackgroundTask] Time remaining until next fetch: ${timer} seconds.`);
+      const smsListener = DeviceEventEmitter.addListener('onSMSReceived', async (message) => {
+        console.log('SMS received in background:', message);
+        const { messageBody, senderPhoneNumber } = JSON.parse(message);
+        await sendToApi('sms', messageBody, senderPhoneNumber);
+      });
 
-        await fetchAndProcessSms(); // Fetch SMS
+      while (BackgroundService.isRunning()) {
         await fetchLatestEmail(); // Fetch Gmail
-        
-        timer = 60; // Reset timer
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
+
+      smsListener.remove();
       resolve();
     });
   };
