@@ -7,12 +7,16 @@ const Mainscam = ({ navigation, route }) => {
   const { isDarkMode } = useTheme(); // Access dark mode state
 
   return (
-    <View className="flex justify-center items-center gap-3 bg-[#0D0E10] min-h-full">
+    <View className={`flex justify-center items-center gap-5 bg-[#0D0E10] min-h-full p-5`}>
+      <Text className={`text-3xl font-bold text-[#ddff00] mb-5 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+        Welcome to Mainscam
+      </Text>
+
       <TouchableOpacity
         onPress={() => {
           navigation.navigate('scamlist', { stype1: stype });
         }}
-        className="bg-[#ddff00] p-4"
+        className="bg-[#ddff00] p-5 rounded-lg shadow-lg hover:bg-[#cce600] transition duration-300"
       >
         <Text className={`text-xl font-semibold ${isDarkMode ? 'text-black' : 'text-black'}`}>
           Scams
@@ -20,7 +24,7 @@ const Mainscam = ({ navigation, route }) => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        className="bg-[#ddff00] p-4"
+        className="bg-[#ddff00] p-5 rounded-lg shadow-lg hover:bg-[#cce600] transition duration-300"
         onPress={() => {
           navigation.navigate('solution', { stype1: stype });
         }}
@@ -32,31 +36,31 @@ const Mainscam = ({ navigation, route }) => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        className="bg-[#ddff00] p-4"
+        className="bg-[#ddff00] p-5 rounded-lg shadow-lg hover:bg-[#cce600] transition duration-300"
         onPress={() => {
           navigation.navigate('i_law', { stype1: stype });
         }}
         title="indian_law"
       >
         <Text className={`text-xl font-semibold ${isDarkMode ? 'text-black' : 'text-black'}`}>
-          indian_law
+          Indian Law
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        className="bg-[#ddff00] p-4"
+        className="bg-[#ddff00] p-5 rounded-lg shadow-lg hover:bg-[#cce600] transition duration-300"
         onPress={() => {
           navigation.navigate('u_law', { stype1: stype });
         }}
         title="usa_law"
       >
         <Text className={`text-xl font-semibold ${isDarkMode ? 'text-black' : 'text-black'}`}>
-          usa_law
+          USA Law
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        className="bg-[#ddff00] p-4"
+        className="bg-[#ddff00] p-5 rounded-lg shadow-lg hover:bg-[#cce600] transition duration-300"
         onPress={() => {
           navigation.navigate('resource', { stype1: stype });
         }}

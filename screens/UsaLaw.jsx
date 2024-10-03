@@ -42,7 +42,7 @@ const UsaLaw = ({route}) => {
 
   return (
     <View className="flex-1 p-5 bg-[#0D0E10]">
-      <Text className="text-2xl font-bold mb-5 text-white">
+      <Text className="text-2xl font-bold mb-5 text-[#ddff00]">
         Details for {stype1}
       </Text>
       <ScrollView>
@@ -53,14 +53,14 @@ const UsaLaw = ({route}) => {
                 <Text className="text-lg mb-2 text-white">
                   Scam Name: {solu.scam_name}
                 </Text>
-                <Text className="text-base mb-5 text-white">
+                <Text className="text-base text-white">
                   USA Law: {solu.usa_law}
                 </Text>
               </View>
             ))}
           </View>
         ) : (
-          <Text>No details found for {stype1}</Text>
+          <Text className="text-white">No details found for {stype1}</Text>
         )}
       </ScrollView>
     </View>

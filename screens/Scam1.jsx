@@ -37,26 +37,26 @@ const Scam1 = ({route}) => {
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-[#0D0E10]">
-        <Text className="bg-white">Loading...</Text>
+        <Text className="text-white">Loading...</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 p-5 bg-[#0D0E10] text-white">
-      <Text className="text-2xl font-bold mb-5 text-white">
+    <View className="flex-1 p-5 bg-[#0D0E10]">
+      <Text className="text-2xl font-bold mb-5 text-[#ddff00]">
         Scam List for {stype1}
       </Text>
       {scams.length > 0 ? (
         <View>
           {scams.map(scam => (
-            <Text key={scam.id} className="text-white">
+            <Text key={scam.id} className="text-white text-lg mb-2">
               {scam.scam_name}
             </Text>
           ))}
         </View>
       ) : (
-        <Text>No scams found for {stype1}</Text>
+        <Text className="text-white">No scams found for {stype1}</Text>
       )}
     </View>
   );

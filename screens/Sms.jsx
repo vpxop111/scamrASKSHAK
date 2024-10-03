@@ -16,13 +16,14 @@ import { AuthContext } from '../AuthContext';
 import { BackgroundTaskContext } from '../BackgroundTaskContext';
 
 const Sms = () => {
-  const { user } = useContext(AuthContext);
+  const { user,userInfo } = useContext(AuthContext);
   const { isTaskRunning, startTask, stopTask } = useContext(BackgroundTaskContext);
   const [latestSms, setLatestSms] = useState('');
   const [smsSender, setSmsSender] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [scamMessages, setScamMessages] = useState([]);
 
+  console.log('User Info:', userInfo);
   useEffect(() => {
     requestReadSmsPermission();
     fetchScamMessages();

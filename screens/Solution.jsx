@@ -35,14 +35,14 @@ const Solution = ({route}) => {
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-[#0D0E10]">
-        <Text className="bg-white">Loading...</Text>
+        <Text className="text-white">Loading...</Text>
       </View>
     );
   }
 
   return (
     <View className="flex-1 p-5 bg-[#0D0E10]">
-      <Text className="text-2xl font-bold mb-5 text-white">
+      <Text className="text-2xl font-bold mb-5 text-[#ddff00]">
         Details for {stype1}
       </Text>
       <ScrollView>
@@ -53,14 +53,14 @@ const Solution = ({route}) => {
                 <Text className="text-lg mb-2 text-white">
                   Scam Name: {solu.scam_name}
                 </Text>
-                <Text className="text-base mb-5 text-white">
+                <Text className="text-base text-white">
                   Solution: {solu.Solution}
                 </Text>
               </View>
             ))}
           </View>
         ) : (
-          <Text>No details found for {stype1}</Text>
+          <Text className="text-white">No details found for {stype1}</Text>
         )}
       </ScrollView>
     </View>

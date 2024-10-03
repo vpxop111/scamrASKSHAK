@@ -56,7 +56,7 @@ const Resource = ({route}) => {
 
   return (
     <View className="flex-1 p-5 bg-[#0D0E10]">
-      <Text className="text-2xl font-bold mb-5 text-white">
+      <Text className="text-2xl font-bold mb-5 text-[#ddff00]">
         Details for {stype1}
       </Text>
       <ScrollView>
@@ -82,7 +82,7 @@ const Resource = ({route}) => {
             ))}
           </View>
         ) : (
-          <Text>No details found for {stype1}</Text>
+          <Text className="text-white">No details found for {stype1}</Text>
         )}
       </ScrollView>
     </View>

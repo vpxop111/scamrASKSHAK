@@ -26,7 +26,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AuthContext} from '../AuthContext';
 import {FlatList} from 'react-native-gesture-handler';
 import { useBackgroundTask } from '../BackgroundTaskContext';
-
 const {width, height} = Dimensions.get('window');
 
 // Client IDs for Google Sign-In
@@ -81,8 +80,7 @@ const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
 const Gmail1 = () => {
   const { isTaskRunning, startTask, stopTask } = useBackgroundTask();
-  const { user } = useContext(AuthContext);
-  const [userInfo, setUserInfo] = useState(null);
+  const { user, setUserInfo } = useContext(AuthContext);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
   const [latestEmailId, setLatestEmailId] = useState(null);
@@ -159,13 +157,11 @@ const Gmail1 = () => {
   };
 
   const checkLoginStatus = async () => {
-    const gmailUserInfo = await AsyncStorage.getItem('gmailUserInfo');
-    if (gmailUserInfo) {
-      setUserInfo(JSON.parse(gmailUserInfo)); // Set user info if logged in
-      setIsLoggedIn(true); // Update logged-in state
-      console.log('User is logged in:', JSON.parse(gmailUserInfo).email); // Log user email
+    if (user) {
+      setIsLoggedIn(true);
+      console.log('User is logged in:', user.email); // Log user email
     } else {
-      setIsLoggedIn(false); // Update logged-out state
+      setIsLoggedIn(false);
       console.log('User is not logged in'); // Log user not logged in
     }
   };
@@ -186,24 +182,29 @@ const Gmail1 = () => {
 
   const signIn = async () => {
     if (isSigninInProgress) return;
-
     setIsSigninInProgress(true);
     try {
-        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        const userInfo = await GoogleSignin.signIn();
-        setUserInfo(userInfo);
-        await AsyncStorage.setItem('gmailUserInfo', JSON.stringify(userInfo)); // Store user info
-        console.log('User signed in:', userInfo); // Log user info
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const userInfo = await GoogleSignin.signIn();
+      setUserInfo(userInfo); // Store userInfo in AuthContext
+      await AsyncStorage.setItem('gmailUserInfo', JSON.stringify(userInfo)); // Store user info
+      console.log('User signed in:', userInfo); // Log user info
+      console.log("sss",userInfo)
     } catch (error) {
-        console.error('Sign-In Error:', error);
-        Alert.alert(
-            'Sign-In Error',
-            'An error occurred during sign-in. Please try again.',
-        );
+      console.error('Sign-In Error:', error);
+      Alert.alert(
+        'Sign-In Error',
+        'An error occurred during sign-in. Please try again.',
+      );
     } finally {
-        setIsSigninInProgress(false);
+      setIsSigninInProgress(false);
     }
+    
   };
+
+ 
+  
+
 
   const signOut = async () => {
     try {
@@ -221,7 +222,7 @@ const Gmail1 = () => {
   };
 
   const fetchLatestEmail = useCallback(async () => {
-    if (isLoading || !userInfo) return;
+    if (isLoading || !user) return; // Check if user is available
     setIsLoading(true);
     try {
       const {accessToken} = await GoogleSignin.getTokens();
@@ -253,7 +254,7 @@ const Gmail1 = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [latestEmailId, isLoading, userInfo]);
+  }, [latestEmailId, isLoading, user]);
 
   const base64UrlDecode = str => {
     try {
@@ -367,10 +368,11 @@ const Gmail1 = () => {
     }
   };
 
+  
   useEffect(() => {
     fetchScamEmails();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updatesr
     const channel = supabase.channel(`public:scam_email`)
       .on('postgres_changes', {
         event: '*',
@@ -449,7 +451,7 @@ const Gmail1 = () => {
         Gmail Scam Detection
       </Text>
 
-      {userInfo ? (
+      {user ? (
         <View className="mb-4 ">
           <TouchableOpacity
             onPress={signOut}
