@@ -90,7 +90,7 @@ const BackgroundTaskProvider = ({ children }) => {
 
   // Send SMS data to the API
   const sendToApi = async (type, messageBody, senderPhoneNumber) => {
-    let apiEndpoint = 'https://varun324242-sssssss.hf.space/predict';
+    const apiEndpoint = 'https://varun324242-sssssss.hf.space/predict';
     
     // Construct the payload for SMS
     const payload = {
@@ -111,6 +111,11 @@ const BackgroundTaskProvider = ({ children }) => {
 
       const result = await response.json();
       console.log('SMS API Response:', result);
+
+      // Check if the response indicates a scam
+      if (result.predicted_result && result.predicted_result.toLowerCase() === 'scam') {
+        showNotification('sms', senderPhoneNumber); // Show notification for scam SMS
+      }
     } catch (error) {
       console.error('Error sending SMS to API:', error);
     }
@@ -228,14 +233,14 @@ const BackgroundTaskProvider = ({ children }) => {
       BackgroundService.start(backgroundTask, {
         taskName: 'SMS and Gmail Scanner',
         taskTitle: 'Scanning for Scams',
-        taskDesc: 'Checking SMS and Gmail every minute',
+        taskDesc: 'Checking SMS and Gmail every 3 minutes',
         taskIcon: {
           name: 'ic_launcher',
           type: 'mipmap',
         },
         color: '#ff00ff',
         parameters: {
-          delay: 60000, // 60 seconds
+          delay: 180000, // 3 minutes
         },
         ongoing: true, // Prevent the notification from being dismissed
       });
