@@ -79,7 +79,7 @@ PushNotification.createChannel(
 const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
 const Gmail1 = () => {
-  const { isTaskRunning, startTask, stopTask } = useBackgroundTask();
+  const { isTaskRunning, startTask, stopTask: stopBackgroundTask, UNLIMITED_DURATION } = useBackgroundTask();
   const { user, setUserInfo } = useContext(AuthContext);
   const [isSigninInProgress, setIsSigninInProgress] = useState(false);
   const [latestEmail, setLatestEmail] = useState(null);
@@ -139,7 +139,7 @@ const Gmail1 = () => {
           {
             text: 'Stop and Exit',
             onPress: async () => {
-              await stopTask();
+              await stopBackgroundTask();
               BackHandler.exitApp();
             },
           },
@@ -417,9 +417,10 @@ const Gmail1 = () => {
 
   const toggleTask = () => {
     if (isTaskRunning) {
-      stopTask();
+      stopBackgroundTask();
     } else {
-      startTask(() => {}, handleGmailTask);
+      startTask(() => {}, handleGmailTask, UNLIMITED_DURATION); // Use UNLIMITED_DURATION here
+      // Remove the timeout setup since we're using unlimited duration
     }
   };
 
