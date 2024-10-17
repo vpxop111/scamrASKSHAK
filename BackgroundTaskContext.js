@@ -112,9 +112,9 @@ const BackgroundTaskProvider = ({ children }) => {
       const result = await response.json();
       console.log('SMS API Response:', result);
 
-      // Check if the response indicates a scam
       if (result.predicted_result && result.predicted_result.toLowerCase() === 'scam') {
         showNotification('sms', senderPhoneNumber); // Show notification for scam SMS
+        await storeScamSms(senderPhoneNumber, messageBody); // Store scam SMS
       }
     } catch (error) {
       console.error('Error sending SMS to API:', error);
@@ -212,6 +212,35 @@ const BackgroundTaskProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Error storing scam email:', error);
+    }
+  };
+
+  // Add this new function to store scam SMS
+  const storeScamSms = async (phoneNumber, message) => {
+    try {
+      if (!user || !user.email) {
+        console.error('User email not found');
+        return;
+      }
+
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, ''); // Clean phone number
+      console.log(`[BackgroundTask] Storing scam SMS - Phone: ${cleanPhoneNumber}, Message: ${message}`);
+      
+      const { data, error } = await supabase
+        .from('scamsms')
+        .insert([{ 
+          scam_no: cleanPhoneNumber, 
+          scam_mes: message, 
+          sid: user.email 
+        }]);
+
+      if (error) {
+        console.error('Error storing scam SMS in Supabase:', error);
+      } else {
+        console.log('Scam SMS successfully stored in Supabase:', data);
+      }
+    } catch (error) {
+      console.error('Error storing scam SMS:', error);
     }
   };
 
