@@ -11,7 +11,8 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.flipper.ReactNativeFlipper
 import com.facebook.soloader.SoLoader
-import com.awesomeproject.SmsListenerPackage // Ensure this import is present
+import com.awesomeproject.SmsListenerPackage
+import com.awesomeproject.BackgroundServicePackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -20,7 +21,8 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               // Add your custom packages here
-              add(SmsListenerPackage()) // Ensure this line is present
+              add(SmsListenerPackage()) 
+              add(BackgroundServicePackage()) // Ensure this line is present
             }
 
         override fun getJSMainModuleName(): String = "index"

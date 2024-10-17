@@ -1,13 +1,12 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { DeviceEventEmitter, NativeModules } from 'react-native';
-import BackgroundService from 'react-native-background-actions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import PushNotification from 'react-native-push-notification';
 import { supabase } from './supabase';
 import { AuthContext } from './AuthContext';
 
-const { SmsListenerModule } = NativeModules;
+const { BackgroundServiceModule, SmsListenerModule } = NativeModules;
 
 // Define your Google Client IDs
 const WEB_CLIENT_ID = '483287191355-lr9eqf88sahgfsg63eaoq1p37dp89rh3.apps.googleusercontent.com';
@@ -19,8 +18,8 @@ export const useBackgroundTask = () => useContext(BackgroundTaskContext);
 
 const BackgroundTaskProvider = ({ children }) => {
   const [isTaskRunning, setIsTaskRunning] = useState(false);
-  const { user } = useContext(AuthContext); // Use user from AuthContext
-  const [latestEmailId, setLatestEmailId] = useState(null); // Store latest email ID
+  const { user } = useContext(AuthContext);
+  const [latestEmailId, setLatestEmailId] = useState(null);
 
   useEffect(() => {
     checkTaskStatus();
@@ -46,7 +45,7 @@ const BackgroundTaskProvider = ({ children }) => {
   // Fetch latest Gmail messages
   const fetchLatestEmail = async () => {
     console.log('[BackgroundTask] Fetching latest Gmail...');
-    if (user) { // Check if user is available from AuthContext
+    if (user) {
       try {
         await GoogleSignin.configure({
           offlineAccess: true,
@@ -75,7 +74,7 @@ const BackgroundTaskProvider = ({ children }) => {
 
             const messageData = await messageResponse.json();
             console.log('[BackgroundTask] Latest Gmail:', messageData);
-            await sendEmailToApi(messageData); // Call the function to send email data to your API
+            await sendEmailToApi(messageData);
           }
         } else {
           console.log('[BackgroundTask] No new Gmail messages found');
@@ -92,7 +91,6 @@ const BackgroundTaskProvider = ({ children }) => {
   const sendToApi = async (type, messageBody, senderPhoneNumber) => {
     const apiEndpoint = 'https://varun324242-sssssss.hf.space/predict';
     
-    // Construct the payload for SMS
     const payload = {
       message: messageBody,
     };
@@ -101,7 +99,7 @@ const BackgroundTaskProvider = ({ children }) => {
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload), // Send the complete payload
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -113,8 +111,8 @@ const BackgroundTaskProvider = ({ children }) => {
       console.log('SMS API Response:', result);
 
       if (result.predicted_result && result.predicted_result.toLowerCase() === 'scam') {
-        showNotification('sms', senderPhoneNumber); // Show notification for scam SMS
-        await storeScamSms(senderPhoneNumber, messageBody); // Store scam SMS
+        showNotification('sms', senderPhoneNumber);
+        await storeScamSms(senderPhoneNumber, messageBody);
       }
     } catch (error) {
       console.error('Error sending SMS to API:', error);
@@ -136,7 +134,7 @@ const BackgroundTaskProvider = ({ children }) => {
     const senderHeader = email.payload.headers.find(header => header.name.toLowerCase() === 'from');
     const sender = senderHeader ? senderHeader.value : 'Unknown sender';
 
-    const emailData = { subject, body, sender }; // Ensure all required fields are included
+    const emailData = { subject, body, sender };
 
     try {
       const response = await fetch(
@@ -144,7 +142,7 @@ const BackgroundTaskProvider = ({ children }) => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(emailData), // Send the complete payload
+          body: JSON.stringify(emailData),
         },
       );
 
@@ -158,7 +156,7 @@ const BackgroundTaskProvider = ({ children }) => {
 
       if (result.predicted_result && result.predicted_result.toLowerCase() === 'scam') {
         await storeScamEmail(sender, subject, body);
-        showNotification('gmail', sender); // Notify about the scam
+        showNotification('gmail', sender);
       }
     } catch (error) {
       console.error('Error sending email to API:', error);
@@ -215,7 +213,7 @@ const BackgroundTaskProvider = ({ children }) => {
     }
   };
 
-  // Add this new function to store scam SMS
+  // Store scam SMS in Supabase
   const storeScamSms = async (phoneNumber, message) => {
     try {
       if (!user || !user.email) {
@@ -223,7 +221,7 @@ const BackgroundTaskProvider = ({ children }) => {
         return;
       }
 
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, ''); // Clean phone number
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
       console.log(`[BackgroundTask] Storing scam SMS - Phone: ${cleanPhoneNumber}, Message: ${message}`);
       
       const { data, error } = await supabase
@@ -259,53 +257,45 @@ const BackgroundTaskProvider = ({ children }) => {
         console.log('SmsListenerModule is not available');
       }
 
-      BackgroundService.start(backgroundTask, {
-        taskName: 'SMS and Gmail Scanner',
-        taskTitle: 'Scanning for Scams',
-        taskDesc: 'Checking SMS and Gmail every 3 minutes',
-        taskIcon: {
-          name: 'ic_launcher',
-          type: 'mipmap',
-        },
-        color: '#ff00ff',
-        parameters: {
-          delay: 180000, // 3 minutes
-        },
-        ongoing: true, // Prevent the notification from being dismissed
-      });
+      BackgroundServiceModule.startService();
       console.log('[BackgroundTask] Background task started');
+
+      // Set up event listener for SMS
+      DeviceEventEmitter.addListener('onSMSReceived', handleSmsReceived);
     }
   };
 
   // Stop the background task
   const stopTask = async () => {
     if (isTaskRunning) {
-      await BackgroundService.stop();
+      BackgroundServiceModule.stopService();
       setIsTaskRunning(false);
       await AsyncStorage.removeItem('backgroundTaskStatus');
       console.log('[BackgroundTask] Background task stopped');
+
+      // Remove event listener for SMS
+      DeviceEventEmitter.removeAllListeners('onSMSReceived');
     }
   };
 
-  // Define the background task function
-  const backgroundTask = async (taskDataArguments) => {
-    const { delay } = taskDataArguments;
-    await new Promise(async (resolve) => {
-      const smsListener = DeviceEventEmitter.addListener('onSMSReceived', async (message) => {
-        console.log('SMS received in background:', message);
-        const { messageBody, senderPhoneNumber } = JSON.parse(message);
-        await sendToApi('sms', messageBody, senderPhoneNumber); // Send SMS to API
-      });
-
-      while (BackgroundService.isRunning()) {
-        await fetchLatestEmail(); // Fetch Gmail
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-
-      smsListener.remove();
-      resolve();
-    });
+  // Handle SMS received event
+  const handleSmsReceived = async (message) => {
+    console.log('SMS received in background:', message);
+    const { messageBody, senderPhoneNumber } = JSON.parse(message);
+    await sendToApi('sms', messageBody, senderPhoneNumber);
   };
+
+  // This function will be called periodically by the native module
+  const performBackgroundTask = async () => {
+    if (isTaskRunning) {
+      await fetchLatestEmail();
+    }
+  };
+
+  // Expose the performBackgroundTask function to the native module
+  if (BackgroundServiceModule.setJsCallback) {
+    BackgroundServiceModule.setJsCallback(performBackgroundTask);
+  }
 
   return (
     <BackgroundTaskContext.Provider value={{ isTaskRunning, startTask, stopTask }}>

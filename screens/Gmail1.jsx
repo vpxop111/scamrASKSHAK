@@ -36,31 +36,42 @@ const ANDROID_CLIENT_ID =
 
 // Push Notification Configuration
 PushNotification.configure({
+  // Called when Token is generated (iOS and Android)
   onRegister: token => {
     console.log('TOKEN:', token);
+    // You can send this token to your server for notification targeting
   },
+
+  // Called when a remote or local notification is opened or received
   onNotification: notification => {
     console.log('NOTIFICATION:', notification);
+    // Process the notification here (e.g., navigate to a screen)
     notification.finish(PushNotificationIOS.FetchResult.NoData);
   },
+
+  // Android only: Can be used to configure the notification settings
   permissions: {
     alert: true,
     badge: true,
     sound: true,
   },
+
+  // Set to true to automatically handle notifications when the app is not in the foreground
   popInitialNotification: true,
+
+  // Request permissions on iOS
   requestPermissions: Platform.OS === 'ios',
 });
 
 // Create a notification channel (Android only)
 PushNotification.createChannel(
   {
-    channelId: 'default',
-    channelName: 'Default channel',
-    channelDescription: 'A default channel',
-    soundName: 'default',
-    importance: 4,
-    vibrate: true,
+    channelId: 'default', // (required) Channel ID
+    channelName: 'Default channel', // (required) Channel Name
+    channelDescription: 'A default channel', // (optional) Channel Description
+    soundName: 'default', // (optional) Default sound
+    importance: 4, // (optional) Importance level (4 is high priority)
+    vibrate: true, // (optional) Enable vibration
   },
   created => console.log(`createChannel returned '${created}'`),
 );
@@ -87,7 +98,8 @@ const Gmail1 = () => {
   const scammerCacheRef = useRef({});
   const notifiedScammersRef = useRef({});
 
-  const [timer, setTimer] = useState(60);
+  // Ensure this is declared only once
+  const [timer, setTimer] = useState(60); // Timer state
 
   useEffect(() => {
     configureGoogleSignin();
@@ -102,19 +114,20 @@ const Gmail1 = () => {
       handleAppStateChange,
     );
 
+    // Set up interval for fetching emails every minute
     let fetchInterval;
     if (isLoggedIn) {
       fetchInterval = setInterval(() => {
         fetchLatestEmail();
-      }, 60000);
+      }, 60000); // 60000 ms = 1 minute
     }
 
     return () => {
       backHandler.remove();
       appStateSubscription.remove();
-      clearInterval(fetchInterval);
+      clearInterval(fetchInterval); // Clear interval on unmount
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn]); // Dependency on isLoggedIn
 
   const onBackPress = () => {
     if (isTaskRunning) {
@@ -146,10 +159,10 @@ const Gmail1 = () => {
   const checkLoginStatus = async () => {
     if (user) {
       setIsLoggedIn(true);
-      console.log('User is logged in:', user.email);
+      console.log('User is logged in:', user.email); // Log user email
     } else {
       setIsLoggedIn(false);
-      console.log('User is not logged in');
+      console.log('User is not logged in'); // Log user not logged in
     }
   };
 
@@ -173,18 +186,25 @@ const Gmail1 = () => {
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const userInfo = await GoogleSignin.signIn();
-      setUserInfo(userInfo);
-      await AsyncStorage.setItem('gmailUserInfo', JSON.stringify(userInfo));
-      console.log('User signed in:', userInfo);
+      setUserInfo(userInfo); // Store userInfo in AuthContext
+      await AsyncStorage.setItem('gmailUserInfo', JSON.stringify(userInfo)); // Store user info
+      console.log('User signed in:', userInfo); // Log user info
+      console.log("sss",userInfo)
     } catch (error) {
       console.error('Sign-In Error:', error);
-      // Redirect to login page without showing any error
-      setUserInfo(null);
-      setIsLoggedIn(false);
+      Alert.alert(
+        'Sign-In Error',
+        'An error occurred during sign-in. Please try again.',
+      );
     } finally {
       setIsSigninInProgress(false);
     }
+    
   };
+
+ 
+  
+
 
   const signOut = async () => {
     try {
@@ -195,14 +215,14 @@ const Gmail1 = () => {
       setLatestEmailId(null);
       setEmailStatus(null);
       setConfidence(null);
-      setIsLoggedIn(false); // Ensure isLoggedIn is set to false on sign out
     } catch (error) {
       console.error('Sign out error:', error);
+      Alert.alert('Error', 'An error occurred while signing out');
     }
   };
 
   const fetchLatestEmail = useCallback(async () => {
-    if (isLoading || !user) return;
+    if (isLoading || !user) return; // Check if user is available
     setIsLoading(true);
     try {
       const {accessToken} = await GoogleSignin.getTokens();
@@ -230,6 +250,7 @@ const Gmail1 = () => {
       }
     } catch (error) {
       console.error('Error fetching latest email:', error);
+      Alert.alert('Error', 'Failed to fetch the latest email');
     } finally {
       setIsLoading(false);
     }
@@ -291,14 +312,15 @@ const Gmail1 = () => {
           message: `Scam email detected from ${sender}.`,
           playSound: true,
           soundName: 'default',
-          importance: 'high',
-          vibrate: true,
+          importance: 'high', // for Android
+          vibrate: true, // for Android
         });
       } else {
         setScammerStatus(prev => ({...prev, isScammer: false}));
       }
     } catch (error) {
       console.error('Error sending email to API:', error);
+      Alert.alert('Error', 'Failed to send email to API');
     }
   };
 
@@ -318,6 +340,7 @@ const Gmail1 = () => {
       console.log('Scam email stored successfully:', data);
     } catch (error) {
       console.error('Error storing scam email:', error);
+      Alert.alert('Error', 'Failed to store scam email');
     }
   };
 
@@ -345,9 +368,11 @@ const Gmail1 = () => {
     }
   };
 
+  
   useEffect(() => {
     fetchScamEmails();
 
+    // Subscribe to real-time updatesr
     const channel = supabase.channel(`public:scam_email`)
       .on('postgres_changes', {
         event: '*',
@@ -355,12 +380,12 @@ const Gmail1 = () => {
         table: 'scam_email',
       }, payload => {
         console.log('Change received!', payload);
-        fetchScamEmails();
+        fetchScamEmails(); // Refresh the list after any change
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel); // Clean up the subscription
     };
   }, [user]);
 
@@ -373,7 +398,7 @@ const Gmail1 = () => {
         console.error('Error deleting scam email:', error);
       } else {
         console.log('Scam email successfully deleted.');
-        fetchScamEmails();
+        fetchScamEmails(); // Refresh the list after deletion
       }
     } catch (error) {
       console.error('Error deleting scam email:', error);
@@ -394,23 +419,29 @@ const Gmail1 = () => {
     if (isTaskRunning) {
       stopBackgroundTask();
     } else {
-      startTask(() => {}, handleGmailTask, UNLIMITED_DURATION);
+      startTask(() => {}, handleGmailTask, UNLIMITED_DURATION); // Use UNLIMITED_DURATION here
+      // Remove the timeout setup since we're using unlimited duration
     }
   };
 
+  // Timer countdown in seconds
   useEffect(() => {
+    // Fetch immediately on mount
     fetchLatestEmail();
 
+    // Set up the timer interval
     const intervalId = setInterval(() => {
       setTimer(prevTimer => {
         if (prevTimer <= 1) {
+          // Fetch email when timer hits zero
           fetchLatestEmail();
-          return 60;
+          return 60; // Reset timer
         }
         return prevTimer - 1;
       });
-    }, 1000);
+    }, 1000); // Update timer every second
 
+    // Clear interval on unmount
     return () => clearInterval(intervalId);
   }, [fetchLatestEmail]);
 
@@ -421,7 +452,7 @@ const Gmail1 = () => {
         Gmail Scam Detection
       </Text>
 
-      {isLoggedIn ? (
+      {user ? (
         <View className="mb-4 ">
           <TouchableOpacity
             onPress={signOut}
