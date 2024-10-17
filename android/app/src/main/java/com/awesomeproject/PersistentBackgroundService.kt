@@ -7,9 +7,12 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import java.lang.Thread
+import kotlinx.coroutines.*
 
 class PersistentBackgroundService : Service() {
+    private val serviceScope = CoroutineScope(Dispatchers.Default)
+    private var isRunning = false
+
     companion object {
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "PersistentBackgroundService"
@@ -22,19 +25,28 @@ class PersistentBackgroundService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
         
-        // Simulate some background work
-        Thread {
-            while (true) {
-                Log.d("BGService", "Background task running")
-                Thread.sleep(60000) // Log every minute
-            }
-        }.start()
+        if (!isRunning) {
+            isRunning = true
+            runBackgroundTask()
+        }
 
         return START_STICKY
     }
 
+    private fun runBackgroundTask() {
+        serviceScope.launch {
+            while (isRunning) {
+                Log.d("BGService", "Background task running")
+                // Perform your background tasks here
+                delay(60000) // Wait for 1 minute
+            }
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
+        serviceScope.cancel()
         Log.d("BGService", "Service destroyed")
     }
 
