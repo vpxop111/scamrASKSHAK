@@ -24,6 +24,13 @@ const BackgroundTaskProvider = ({ children }) => {
   useEffect(() => {
     checkTaskStatus();
     setupNotifications();
+    
+    // Add this event listener
+    DeviceEventEmitter.addListener('backgroundTaskTriggered', performBackgroundTask);
+
+    return () => {
+      DeviceEventEmitter.removeAllListeners('backgroundTaskTriggered');
+    };
   }, []);
 
   const setupNotifications = () => {
@@ -285,10 +292,12 @@ const BackgroundTaskProvider = ({ children }) => {
     await sendToApi('sms', messageBody, senderPhoneNumber);
   };
 
-  // This function will be called periodically by the native module
+  // Modify the performBackgroundTask function
   const performBackgroundTask = async () => {
     if (isTaskRunning) {
+      console.log('[BackgroundTask] Performing background task');
       await fetchLatestEmail();
+      // Add any other background tasks here
     }
   };
 
